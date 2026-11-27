@@ -292,34 +292,30 @@ function unlockAudio(){
 
   if(!audioContext){
    audioContext = new AudioAPI();
-
    masterGain = audioContext.createGain();
+
+   // Mengikuti volume media perangkat
    masterGain.gain.value = 1.0;
    masterGain.connect(audioContext.destination);
   }
-
-  if(audioStarting)return audioStarting;
 
   if(audioContext.state === "running"){
    audioUnlocked = true;
    return Promise.resolve(true);
   }
 
-  audioStarting = audioContext.resume()
-   .then(()=>{
-    audioUnlocked = audioContext.state === "running";
-    return audioUnlocked;
-   })
-   .catch(error=>{
-    console.warn("Audio gagal diaktifkan:",error);
-    audioUnlocked = false;
-    return false;
-   })
-   .finally(()=>{
-    audioStarting = null;
-   });
+  const resumePromise = audioContext.resume();
 
-  return audioStarting;
+  audioUnlocked = true;
+
+  return resumePromise.then(()=>{
+   audioUnlocked = audioContext.state === "running";
+   return audioUnlocked;
+  }).catch(error=>{
+   console.warn("Audio gagal diaktifkan:",error);
+   audioUnlocked = false;
+   return false;
+  });
 
  }catch(error){
   console.warn("Audio tidak tersedia:",error);
@@ -330,7 +326,6 @@ function unlockAudio(){
 
 function tone(freq,duration,delay=0,volume=0.20){
  if(!soundEnabled || !audioContext || !masterGain)return;
- if(audioContext.state !== "running")return;
 
  try{
   const start = audioContext.currentTime + delay;
@@ -402,7 +397,7 @@ document.addEventListener(
 );
 
 document.addEventListener(
- "touchend",
+ "touchstart",
  prepareAudio,
  {capture:true,passive:true}
 );
@@ -413,21 +408,14 @@ document.addEventListener(
  {capture:true}
 );
 
-// Coba aktifkan kembali audio saat halaman dibuka
-window.addEventListener("pageshow",()=>{
- if(soundEnabled){
-  unlockAudio();
- }
-});
-
-// Coba aktifkan kembali audio saat kembali ke halaman
 document.addEventListener("visibilitychange",()=>{
  if(!document.hidden && soundEnabled){
   unlockAudio();
  }
 });
 
-soundBtn.addEventListener("click",async()=>{
+soundBtn.addEventListener("click",()=>{
+ // Jika audio belum aktif, tekan pertama untuk mengaktifkan
  if(!soundEnabled || !audioUnlocked){
   soundEnabled=true;
 
@@ -435,11 +423,11 @@ soundBtn.addEventListener("click",async()=>{
   soundBtn.classList.remove("off");
   soundBtn.setAttribute("aria-label","Matikan suara");
 
-  const ready=await unlockAudio();
-
-  if(ready && soundEnabled){
-   tone(700,0.16,0,0.35);
-  }
+  unlockAudio().then(ready=>{
+   if(ready && soundEnabled){
+    tone(700,0.16,0,0.35);
+   }
+  });
 
  }else{
   soundEnabled=false;
