@@ -192,7 +192,7 @@ let soundEnabled = true;
 let audioContext = null;
 let masterGain = null;
 let audioUnlocked = false;
-let audioStarting = null;
+let audioStarting = false;
 
 let engine = null;
 let engineReady = false;
@@ -208,7 +208,7 @@ const symbols = {
 };
 
 // =====================================
-// SISTEM SUARA UNIVERSAL
+// SISTEM SUARA UNIVERSAL ANDROID, IOS, PC
 // =====================================
 
 function unlockAudio(){
@@ -227,54 +227,52 @@ function unlockAudio(){
    masterGain.connect(audioContext.destination);
   }
 
-  if(audioContext.state === "running"){
-   audioUnlocked = true;
+  if(audioContext.state==="running"){
+   audioUnlocked=true;
    return Promise.resolve(true);
   }
 
   if(audioStarting){
-   return audioStarting;
+   return audioContext.resume().then(()=>{
+    audioUnlocked=audioContext.state==="running";
+    return audioUnlocked;
+   });
   }
 
-  audioStarting = audioContext.resume().then(()=>{
-   audioUnlocked = audioContext.state === "running";
+  audioStarting=true;
+
+  return audioContext.resume().then(()=>{
+   audioUnlocked=audioContext.state==="running";
    return audioUnlocked;
   }).catch(error=>{
-   console.warn("Audio gagal diaktifkan:",error);
-   audioUnlocked = false;
+   console.warn("Audio belum aktif:",error);
+   audioUnlocked=false;
    return false;
   }).finally(()=>{
-   audioStarting = null;
+   audioStarting=false;
   });
-
-  return audioStarting;
 
  }catch(error){
   console.warn("Audio tidak tersedia:",error);
-  audioUnlocked = false;
   return Promise.resolve(false);
  }
 }
 
 function tone(freq,duration,delay=0,volume=0.20){
- if(!soundEnabled || !audioUnlocked || !audioContext || !masterGain)return;
+ if(!soundEnabled || !audioUnlocked || !audioContext)return;
 
  try{
-  const start = audioContext.currentTime + delay;
+  const start=audioContext.currentTime+delay;
 
-  const oscillator = audioContext.createOscillator();
-  const gain = audioContext.createGain();
+  const oscillator=audioContext.createOscillator();
+  const gain=audioContext.createGain();
 
-  oscillator.type = "sine";
+  oscillator.type="sine";
   oscillator.frequency.setValueAtTime(freq,start);
 
   gain.gain.setValueAtTime(0.0001,start);
-  gain.gain.exponentialRampToValueAtTime(
-   volume,start+0.025
-  );
-  gain.gain.exponentialRampToValueAtTime(
-   0.0001,start+duration
-  );
+  gain.gain.exponentialRampToValueAtTime(volume,start+0.025);
+  gain.gain.exponentialRampToValueAtTime(0.0001,start+duration);
 
   oscillator.connect(gain);
   gain.connect(masterGain);
@@ -283,34 +281,31 @@ function tone(freq,duration,delay=0,volume=0.20){
   oscillator.stop(start+duration+0.04);
 
  }catch(error){
-  console.warn("Nada gagal dimainkan:",error);
+  console.warn("Gagal memainkan suara:",error);
  }
 }
 
-function playSound(type){
+async function playSound(type){
  if(!soundEnabled)return;
 
- unlockAudio().then(ready=>{
-  if(!ready || !soundEnabled)return;
+ const ready=await unlockAudio();
+ if(!ready || !soundEnabled)return;
 
-  if(type==="capture"){
-   tone(350,0.13,0,0.23);
-   tone(250,0.17,0.16,0.23);
+ if(type==="capture"){
+  tone(350,0.13,0,0.23);
+  tone(250,0.17,0.16,0.23);
 
-  }else if(type==="check"){
-   tone(850,0.13,0,0.24);
-   tone(1100,0.18,0.16,0.24);
+ }else if(type==="check"){
+  tone(850,0.13,0,0.24);
+  tone(1100,0.18,0.16,0.24);
 
-  }else{
-   tone(620,0.11,0,0.20);
-  }
- });
+ }else{
+  tone(620,0.11,0,0.20);
+ }
 }
 
 function prepareAudio(){
- if(soundEnabled){
-  unlockAudio();
- }
+ if(soundEnabled)unlockAudio();
 }
 
 document.addEventListener(
@@ -331,13 +326,7 @@ document.addEventListener(
  {capture:true}
 );
 
-document.addEventListener("visibilitychange",()=>{
- if(!document.hidden && soundEnabled){
-  unlockAudio();
- }
-});
-
-soundBtn.addEventListener("click",()=>{
+soundBtn.addEventListener("click",async()=>{
  if(soundEnabled){
   soundEnabled=false;
   soundBtn.textContent="🔇";
@@ -350,11 +339,11 @@ soundBtn.addEventListener("click",()=>{
   soundBtn.classList.remove("off");
   soundBtn.setAttribute("aria-label","Matikan suara");
 
-  unlockAudio().then(ready=>{
-   if(ready && soundEnabled){
-    tone(700,0.12,0,0.20);
-   }
-  });
+  const ready=await unlockAudio();
+
+  if(ready){
+   tone(700,0.12,0,0.20);
+  }
  }
 });
 
@@ -731,8 +720,8 @@ function pieceNameAt(fen,square){
  const names={
   k:"Raja",
   q:"Ratu",
-  r:"Tank",
-  b:"Bishop",
+  r:"Benteng (Tank)",
+  b:"Gajah (Bishop)",
   n:"Kuda",
   p:"Pion"
  };
@@ -744,8 +733,9 @@ function moveArrow(line,fen){
  if(!line || !line.pv || !line.pv.length)return "";
 
  const move=uciToMove(line.pv[0]);
+ const name=pieceNameAt(fen,move.from);
 
- return pieceNameAt(fen,move.from);
+ return name+": "+move.from+" → "+move.to;
 }
 
 function stopAnalysis(){
@@ -850,7 +840,7 @@ async function analyzePosition(){
    recommendationHTML+=
     '<div class="recommendation"><strong>Rekomendasi '+
     (index+1)+'</strong><br>'+
-    '<strong>Bidak: '+arrow+'</strong><br>'+
+    '<strong>Arah langkah: '+arrow+'</strong><br>'+
     scoreText(line.score)+'<br>'+
     '<span class="small">'+
     describeLine(line,originalFen)+
@@ -863,7 +853,8 @@ async function analyzePosition(){
 
    recommendationHTML=
     '<div class="recommendation"><strong>Rekomendasi 1</strong><br>'+
-    '<strong>Bidak: '+fallbackName+
+    '<strong>Arah langkah: '+fallbackName+': '+
+    fallbackMove.from+' → '+fallbackMove.to+
     '</strong><br>Langkah terbaik ditemukan.</div>';
   }
 
@@ -871,73 +862,10 @@ async function analyzePosition(){
    recommendationsEl.innerHTML=
     '<div class="recommendation"><strong>Jalur CHECKMATE tercepat ditemukan!</strong><br>'+
     scoreText(selectedLine.score)+
-    '<br><span class="small">Bidak yang dijalankan: '+
+    '<br><span class="small">Langkah pertama: '+
     moveArrow(selectedLine,originalFen)+'</span></div>'+
     recommendationHTML;
   }else if(mateMode){
    recommendationsEl.innerHTML=
     '<div class="recommendation"><strong>Pencarian Checkmate selesai.</strong><br>'+
-    'Belum ditemukan jalur Checkmate paksa dalam pencarian ini.</div>'+
-    recommendationHTML;
-  }else{
-   recommendationsEl.innerHTML=recommendationHTML;
-  }
-
-  // Jalankan langkah pertama dari jalur yang dipilih
-  const chosenUci=
-   selectedLine && selectedLine.pv.length
-    ?selectedLine.pv[0]
-    :bestMove;
-
-  const move=uciToMove(chosenUci);
-
-  const result=game.move({
-   from:move.from,
-   to:move.to,
-   promotion:move.promotion||"q"
-  });
-
-  if(result){
-   playSound(result.captured?"capture":"move");
-
-   clearSelection();
-   renderBoard();
-   updateGameStatus();
-
-   if(game.in_checkmate()){
-    updateGameStatus();
-   }else{
-    statusEl.textContent=
-     "Rekomendasi pertama sudah dijalankan: "+
-     result.san+". Sekarang giliran lawan.";
-   }
-
-  }else{
-   throw new Error("Langkah dari mesin tidak dapat diterapkan.");
-  }
-
- }catch(error){
-  statusEl.textContent=
-   error.message||"Terjadi kesalahan saat analisis.";
-
-  recommendationsEl.textContent=
-   "Analisis gagal. Periksa file Stockfish dan koneksi internet.";
-
- }finally{
-  engineBusy=false;
-  analyzeBtn.disabled=false;
- }
-}
-
-analyzeBtn.addEventListener("click",analyzePosition);
-
-// =====================================
-// MULAI APLIKASI
-// =====================================
-
-renderBoard();
-updateGameStatus();
-
-</script>
-</body>
-</html>
+    'Belum ditemukan jalur Checkmate paksa dalam pencarian ini.<
