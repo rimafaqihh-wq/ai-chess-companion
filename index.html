@@ -64,11 +64,15 @@ select{max-width:125px}
  -webkit-text-stroke:1px rgba(0,0,0,.35);
 }
 .piece.white{
- color:#addfff !important;
- -webkit-text-fill-color:#addfff !important;
- -webkit-text-stroke:2px #fff !important;
- text-shadow:0 1px 1px #52758c;
- filter:none !important;
+ color:#addfff;
+ -webkit-text-fill-color:#addfff;
+ -webkit-text-stroke:1.6px #fff;
+ text-shadow:0 1px 1px #52758c,1px 2px 2px #52758c;
+}
+.piece.black{
+ color:#77716e;
+ -webkit-text-stroke:1.2px #211b19;
+ text-shadow:0 1px 2px #e3d1b5;
 }
 .checked-king:before{
  content:"";position:absolute;width:75%;height:75%;
