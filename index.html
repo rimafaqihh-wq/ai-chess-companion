@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+lam pencarian in<!DOCTYPE html>
 <html lang="id">
 <head>
 <meta charset="UTF-8">
@@ -192,6 +192,7 @@ let soundEnabled = true;
 let audioContext = null;
 let masterGain = null;
 let audioUnlocked = false;
+let audioStarting = false;
 
 let engine = null;
 let engineReady = false;
@@ -207,16 +208,16 @@ const symbols = {
 };
 
 // =====================================
-// SISTEM SUARA UNIVERSAL
+// SISTEM SUARA UNIVERSAL ANDROID, IOS, PC
 // =====================================
 
-async function unlockAudio(){
+function unlockAudio(){
  try{
   const AudioAPI =
    window.AudioContext ||
    window.webkitAudioContext;
 
-  if(!AudioAPI)return false;
+  if(!AudioAPI)return Promise.resolve(false);
 
   if(!audioContext){
    audioContext = new AudioAPI();
@@ -226,17 +227,34 @@ async function unlockAudio(){
    masterGain.connect(audioContext.destination);
   }
 
-  if(audioContext.state !== "running"){
-   await audioContext.resume();
+  if(audioContext.state==="running"){
+   audioUnlocked=true;
+   return Promise.resolve(true);
   }
 
-  audioUnlocked = audioContext.state === "running";
-  return audioUnlocked;
+  if(audioStarting){
+   return audioContext.resume().then(()=>{
+    audioUnlocked=audioContext.state==="running";
+    return audioUnlocked;
+   });
+  }
+
+  audioStarting=true;
+
+  return audioContext.resume().then(()=>{
+   audioUnlocked=audioContext.state==="running";
+   return audioUnlocked;
+  }).catch(error=>{
+   console.warn("Audio belum aktif:",error);
+   audioUnlocked=false;
+   return false;
+  }).finally(()=>{
+   audioStarting=false;
+  });
 
  }catch(error){
-  console.warn("Audio gagal diaktifkan:",error);
-  audioUnlocked = false;
-  return false;
+  console.warn("Audio tidak tersedia:",error);
+  return Promise.resolve(false);
  }
 }
 
@@ -244,21 +262,17 @@ function tone(freq,duration,delay=0,volume=0.20){
  if(!soundEnabled || !audioUnlocked || !audioContext)return;
 
  try{
-  const start = audioContext.currentTime + delay;
+  const start=audioContext.currentTime+delay;
 
-  const oscillator = audioContext.createOscillator();
-  const gain = audioContext.createGain();
+  const oscillator=audioContext.createOscillator();
+  const gain=audioContext.createGain();
 
-  oscillator.type = "sine";
+  oscillator.type="sine";
   oscillator.frequency.setValueAtTime(freq,start);
 
   gain.gain.setValueAtTime(0.0001,start);
-  gain.gain.exponentialRampToValueAtTime(
-   volume,start+0.025
-  );
-  gain.gain.exponentialRampToValueAtTime(
-   0.0001,start+duration
-  );
+  gain.gain.exponentialRampToValueAtTime(volume,start+0.025);
+  gain.gain.exponentialRampToValueAtTime(0.0001,start+duration);
 
   oscillator.connect(gain);
   gain.connect(masterGain);
@@ -267,14 +281,14 @@ function tone(freq,duration,delay=0,volume=0.20){
   oscillator.stop(start+duration+0.04);
 
  }catch(error){
-  console.warn("Nada gagal dimainkan:",error);
+  console.warn("Gagal memainkan suara:",error);
  }
 }
 
 async function playSound(type){
  if(!soundEnabled)return;
 
- const ready = await unlockAudio();
+ const ready=await unlockAudio();
  if(!ready || !soundEnabled)return;
 
  if(type==="capture"){
@@ -291,7 +305,7 @@ async function playSound(type){
 }
 
 function prepareAudio(){
- unlockAudio();
+ if(soundEnabled)unlockAudio();
 }
 
 document.addEventListener(
