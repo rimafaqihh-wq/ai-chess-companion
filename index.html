@@ -192,7 +192,7 @@ let soundEnabled = true;
 let audioContext = null;
 let masterGain = null;
 let audioUnlocked = false;
-let audioStarting = false;
+let audioStarting = null;
 
 let engine = null;
 let engineReady = false;
@@ -208,7 +208,7 @@ const symbols = {
 };
 
 // =====================================
-// SISTEM SUARA UNIVERSAL ANDROID, IOS, PC
+// SISTEM SUARA UNIVERSAL
 // =====================================
 
 function unlockAudio(){
@@ -223,56 +223,58 @@ function unlockAudio(){
    audioContext = new AudioAPI();
 
    masterGain = audioContext.createGain();
-   masterGain.gain.value = 0.7;
+   masterGain.gain.value = 1.0;
    masterGain.connect(audioContext.destination);
   }
 
-  if(audioContext.state==="running"){
-   audioUnlocked=true;
+  if(audioContext.state === "running"){
+   audioUnlocked = true;
    return Promise.resolve(true);
   }
 
   if(audioStarting){
-   return audioContext.resume().then(()=>{
-    audioUnlocked=audioContext.state==="running";
-    return audioUnlocked;
-   });
+   return audioStarting;
   }
 
-  audioStarting=true;
-
-  return audioContext.resume().then(()=>{
-   audioUnlocked=audioContext.state==="running";
+  audioStarting = audioContext.resume().then(()=>{
+   audioUnlocked = audioContext.state === "running";
    return audioUnlocked;
   }).catch(error=>{
-   console.warn("Audio belum aktif:",error);
-   audioUnlocked=false;
+   console.warn("Audio gagal diaktifkan:",error);
+   audioUnlocked = false;
    return false;
   }).finally(()=>{
-   audioStarting=false;
+   audioStarting = null;
   });
+
+  return audioStarting;
 
  }catch(error){
   console.warn("Audio tidak tersedia:",error);
+  audioUnlocked = false;
   return Promise.resolve(false);
  }
 }
 
 function tone(freq,duration,delay=0,volume=0.20){
- if(!soundEnabled || !audioUnlocked || !audioContext)return;
+ if(!soundEnabled || !audioUnlocked || !audioContext || !masterGain)return;
 
  try{
-  const start=audioContext.currentTime+delay;
+  const start = audioContext.currentTime + delay;
 
-  const oscillator=audioContext.createOscillator();
-  const gain=audioContext.createGain();
+  const oscillator = audioContext.createOscillator();
+  const gain = audioContext.createGain();
 
-  oscillator.type="sine";
+  oscillator.type = "sine";
   oscillator.frequency.setValueAtTime(freq,start);
 
   gain.gain.setValueAtTime(0.0001,start);
-  gain.gain.exponentialRampToValueAtTime(volume,start+0.025);
-  gain.gain.exponentialRampToValueAtTime(0.0001,start+duration);
+  gain.gain.exponentialRampToValueAtTime(
+   volume,start+0.025
+  );
+  gain.gain.exponentialRampToValueAtTime(
+   0.0001,start+duration
+  );
 
   oscillator.connect(gain);
   gain.connect(masterGain);
@@ -281,31 +283,34 @@ function tone(freq,duration,delay=0,volume=0.20){
   oscillator.stop(start+duration+0.04);
 
  }catch(error){
-  console.warn("Gagal memainkan suara:",error);
+  console.warn("Nada gagal dimainkan:",error);
  }
 }
 
-async function playSound(type){
+function playSound(type){
  if(!soundEnabled)return;
 
- const ready=await unlockAudio();
- if(!ready || !soundEnabled)return;
+ unlockAudio().then(ready=>{
+  if(!ready || !soundEnabled)return;
 
- if(type==="capture"){
-  tone(350,0.13,0,0.23);
-  tone(250,0.17,0.16,0.23);
+  if(type==="capture"){
+   tone(350,0.13,0,0.40);
+   tone(250,0.17,0.16,0.40);
 
- }else if(type==="check"){
-  tone(850,0.13,0,0.24);
-  tone(1100,0.18,0.16,0.24);
+  }else if(type==="check"){
+   tone(850,0.13,0,0.42);
+   tone(1100,0.18,0.16,0.42);
 
- }else{
-  tone(620,0.11,0,0.20);
- }
+  }else{
+   tone(620,0.11,0,0.35);
+  }
+ });
 }
 
 function prepareAudio(){
- if(soundEnabled)unlockAudio();
+ if(soundEnabled){
+  unlockAudio();
+ }
 }
 
 document.addEventListener(
@@ -326,7 +331,13 @@ document.addEventListener(
  {capture:true}
 );
 
-soundBtn.addEventListener("click",async()=>{
+document.addEventListener("visibilitychange",()=>{
+ if(!document.hidden && soundEnabled){
+  unlockAudio();
+ }
+});
+
+soundBtn.addEventListener("click",()=>{
  if(soundEnabled){
   soundEnabled=false;
   soundBtn.textContent="🔇";
@@ -339,11 +350,11 @@ soundBtn.addEventListener("click",async()=>{
   soundBtn.classList.remove("off");
   soundBtn.setAttribute("aria-label","Matikan suara");
 
-  const ready=await unlockAudio();
-
-  if(ready){
-   tone(700,0.12,0,0.20);
-  }
+  unlockAudio().then(ready=>{
+   if(ready && soundEnabled){
+    tone(700,0.12,0,0.20);
+   }
+  });
  }
 });
 
@@ -720,8 +731,8 @@ function pieceNameAt(fen,square){
  const names={
   k:"Raja",
   q:"Ratu",
-  r:"Benteng (Tank)",
-  b:"Gajah (Bishop)",
+  r:"Tank",
+  b:"Bishop",
   n:"Kuda",
   p:"Pion"
  };
@@ -733,9 +744,8 @@ function moveArrow(line,fen){
  if(!line || !line.pv || !line.pv.length)return "";
 
  const move=uciToMove(line.pv[0]);
- const name=pieceNameAt(fen,move.from);
 
- return name+": "+move.from+" → "+move.to;
+ return pieceNameAt(fen,move.from);
 }
 
 function stopAnalysis(){
@@ -786,7 +796,7 @@ async function analyzePosition(){
   engineBusy=true;
 
   const mateMode=levelEl.value==="mate";
-  const movetime=mateMode?15000:Number(levelEl.value);
+  const movetime=mateMode?3000:Number(levelEl.value);
   const multiPV=mateMode?5:3;
 
   engine.postMessage("setoption name MultiPV value "+multiPV);
@@ -836,11 +846,13 @@ async function analyzePosition(){
 
   lines.slice(0,3).forEach((line,index)=>{
    const arrow=moveArrow(line,originalFen);
+   const move=uciToMove(line.pv[0]);
 
    recommendationHTML+=
     '<div class="recommendation"><strong>Rekomendasi '+
     (index+1)+'</strong><br>'+
-    '<strong>Arah langkah: '+arrow+'</strong><br>'+
+    '<strong>'+arrow+': '+
+    move.from+' → '+move.to+'</strong><br>'+
     scoreText(line.score)+'<br>'+
     '<span class="small">'+
     describeLine(line,originalFen)+
@@ -853,7 +865,7 @@ async function analyzePosition(){
 
    recommendationHTML=
     '<div class="recommendation"><strong>Rekomendasi 1</strong><br>'+
-    '<strong>Arah langkah: '+fallbackName+': '+
+    '<strong>'+fallbackName+': '+
     fallbackMove.from+' → '+fallbackMove.to+
     '</strong><br>Langkah terbaik ditemukan.</div>';
   }
@@ -862,7 +874,7 @@ async function analyzePosition(){
    recommendationsEl.innerHTML=
     '<div class="recommendation"><strong>Jalur CHECKMATE tercepat ditemukan!</strong><br>'+
     scoreText(selectedLine.score)+
-    '<br><span class="small">Langkah pertama: '+
+    '<br><span class="small">Bidak yang dijalankan: '+
     moveArrow(selectedLine,originalFen)+'</span></div>'+
     recommendationHTML;
   }else if(mateMode){
