@@ -1,0 +1,429 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<meta name="theme-color" content="#17131a">
+<title>AI Chess Companion</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/chess.js/0.10.3/chess.min.js"></script>
+<style>
+*{box-sizing:border-box}
+body{margin:0;padding:12px;background:#17131a;color:#f7ead6;font-family:Arial,sans-serif}
+.app{max-width:700px;margin:auto}
+header{text-align:center;padding:10px 0 15px}
+h1{font-size:23px;margin:0;color:#f2d5a5;letter-spacing:1px}
+.subtitle{font-size:12px;color:#bdb0a5;margin-top:6px}
+.panel{background:#29232b;border:1px solid #493b42;border-radius:13px;padding:12px;margin-bottom:11px}
+label{display:block;color:#f2d5a5;font-weight:bold;font-size:13px;margin-bottom:7px}
+select,textarea{width:100%;padding:11px;border-radius:8px;border:1px solid #76616a;background:#f7ead6;color:#21171a;font-size:14px}
+button{border:0;border-radius:9px;padding:11px 13px;background:#85434b;color:white;font-weight:bold;font-size:13px;cursor:pointer}
+button:disabled{opacity:.5}
+button:active{filter:brightness(.85)}
+.row{display:flex;gap:8px;flex-wrap:wrap}
+.row button{flex:1}
+.primary{background:#b07845;color:#fff}
+.secondary{background:#55434b}
+.green{background:#356b54}
+.muted{font-size:12px;line-height:1.5;color:#c9bbc0}
+.sticky{position:sticky;top:0;z-index:20;background:#17131a;padding:4px 0 9px}
+.quick{background:#30252b;border:1px solid #a47758;border-radius:12px;padding:11px}
+.quick small{color:#d9b88e;font-weight:bold}
+#quickMove{font-size:19px;font-weight:bold;color:#ffe1a9;margin-top:5px}
+#quickInfo{font-size:12px;color:#d5c8c6;margin-top:4px}
+.board-area{max-width:560px;margin:12px auto}
+.board-layout{display:grid;grid-template-columns:22px minmax(0,1fr);grid-template-rows:minmax(0,1fr) 22px;gap:3px}
+.ranks,.files{display:grid;align-items:center;text-align:center;color:#f5d7a8;font-size:14px;font-weight:900}
+.ranks{grid-template-rows:repeat(8,1fr)}
+.files{grid-column:2;grid-template-columns:repeat(8,1fr)}
+.board{position:relative;display:grid;grid-template-columns:repeat(8,1fr);grid-template-rows:repeat(8,1fr);aspect-ratio:1;border:4px solid #d5ae7b;box-shadow:0 5px 18px #0008;overflow:hidden}
+.square{position:relative;display:flex;align-items:center;justify-content:center;min-width:0;min-height:0;cursor:pointer}
+.light{background:#e8c69b}
+.dark{background:#54232e}
+.square.selected{background:#e7c54f!important}
+.square.last{box-shadow:inset 0 0 0 4px #e8d66d}
+.square.target:after{content:"";position:absolute;width:25%;height:25%;border-radius:50%;background:#268c51;z-index:2}
+.square.target.capture:after{width:88%;height:88%;background:transparent;border:5px solid #268c51}
+.piece{width:91%;height:91%;display:block;z-index:3;pointer-events:none;opacity:1}
+.piece.white{fill:#fff0ca;stroke:#593a28}
+.piece.black{fill:#28100e;stroke:#f2d1a4}
+.piece path,.piece circle,.piece rect,.piece polygon{stroke-width:3.5;stroke-linejoin:round;stroke-linecap:round}
+#arrowLayer{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;z-index:5}
+.status{background:#30252b;border:1px solid #60454b;text-align:center;padding:11px;border-radius:9px;margin-top:9px;font-size:14px;font-weight:bold;color:#ffe0a8}
+.recommendation{background:#382d32;border:1px solid #604b50;border-left:4px solid #d5a46d;padding:11px;border-radius:9px;margin:8px 0}
+.rec-title{font-weight:bold;color:#f7d9a8;font-size:14px}
+.rec-move{font-size:18px;font-weight:bold;margin-top:6px;color:#fff0d0}
+.rec-detail{font-size:12px;color:#d0c1c0;margin-top:5px}
+#history{max-height:130px;overflow:auto;font-size:13px;line-height:1.8;color:#e3d3cb}
+#message{font-size:12px;color:#e8bd8b;min-height:18px;margin:5px 2px}
+@media(max-width:420px){body{padding:7px}.panel{padding:10px}h1{font-size:21px}.piece{width:96%;height:96%}.board-area{margin:8px auto}.rec-move{font-size:17px}}
+</style>
+</head>
+<body>
+<div class="app">
+<header>
+<h1>♟ AI CHESS COMPANION</h1>
+<div class="subtitle">Asisten langkah catur dengan analisis Stockfish</div>
+</header>
+
+<div class="sticky">
+ <div class="quick">
+  <small>REKOMENDASI UTAMA</small>
+  <div id="quickMove">Belum dianalisis</div>
+  <div id="quickInfo">Tekan Analisis Posisi untuk mencari langkah.</div>
+ </div>
+</div>
+
+<div class="panel">
+ <label>Orientasi papan</label>
+ <select id="side">
+  <option value="w">Putih di bawah</option>
+  <option value="b">Hitam di bawah</option>
+ </select>
+</div>
+
+<div class="board-area">
+ <div class="board-layout">
+  <div class="ranks" id="ranks"></div>
+  <div class="board" id="board">
+   <svg id="arrowLayer" viewBox="0 0 800 800" preserveAspectRatio="none">
+    <defs>
+     <marker id="arrowHead" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
+      <path d="M0,0 L6,3 L0,6" fill="#22a65a" stroke="#22a65a"/>
+     </marker>
+    </defs>
+    <line id="arrowLine" x1="0" y1="0" x2="0" y2="0"
+      stroke="#22a65a" stroke-width="22" stroke-linecap="round"
+      marker-end="url(#arrowHead)" opacity="0.95" visibility="hidden"/>
+   </svg>
+  </div>
+  <div class="files" id="files"></div>
+ </div>
+ <div class="status" id="status">Giliran putih</div>
+</div>
+
+<div class="panel">
+ <div class="row">
+  <button class="secondary" onclick="undoMove()">↶ Kembali</button>
+  <button class="secondary" onclick="resetGame()">⟳ Ulang</button>
+  <button class="secondary" onclick="flipBoard()">⇅ Balik papan</button>
+ </div>
+ <div class="row" style="margin-top:8px">
+  <button class="green" id="soundButton" onclick="toggleSound()">🔊 Suara aktif</button>
+ </div>
+</div>
+
+<div class="panel">
+ <label>Pengaturan analisis</label>
+ <select id="speed">
+  <option value="900">Cepat</option>
+  <option value="1600" selected>Seimbang</option>
+  <option value="2800">Lebih teliti</option>
+ </select>
+ <button class="primary" id="analyzeButton" style="width:100%;margin-top:9px" onclick="analyzePosition()">🔍 ANALISIS POSISI</button>
+ <div class="muted" style="margin-top:7px">Setelah analisis selesai, rekomendasi pertama akan langsung dimainkan di papan.</div>
+</div>
+
+<div class="panel">
+ <label>Rekomendasi AI</label>
+ <div id="recommendations">Belum ada rekomendasi.</div>
+</div>
+
+<div class="panel">
+ <label>Riwayat langkah</label>
+ <div id="history">Belum ada langkah.</div>
+</div>
+
+<div class="panel">
+ <label>Muat posisi FEN</label>
+ <textarea id="fen" rows="3" placeholder="Tempel FEN di sini"></textarea>
+ <button class="secondary" style="margin-top:8px;width:100%" onclick="loadFEN()">Muat posisi</button>
+</div>
+<div id="message"></div>
+</div>
+
+<script>
+const game=new Chess();
+const files="abcdefgh";
+let selected=null,targets=[],flipped=false,lastMove=null;
+let engine=null,engineReady=false,engineBusy=false;
+let soundEnabled=true,audioCtx=null;
+let analysisLines={};
+
+const pieceShapes={
+ p:`<circle cx="50" cy="23" r="13"/><path d="M39 40 Q50 34 61 40 L65 65 L76 82 H24 L35 65Z"/>`,
+ r:`<path d="M24 15 H37 V27 H45 V15 H56 V27 H64 V15 H77 V43 L70 51 L76 82 H24 L30 51 L24 43Z"/>`,
+ n:`<path d="M25 82 L29 60 Q19 42 33 26 L48 14 L49 29 Q72 22 77 47 L68 63 L77 82Z"/><path d="M47 31 L59 37 L47 40Z"/>`,
+ b:`<path d="M50 12 Q69 26 58 41 L68 59 L76 82 H24 L32 59 L42 41 Q31 26 50 12Z"/>`,
+ q:`<circle cx="23" cy="22" r="7"/><circle cx="50" cy="13" r="7"/><circle cx="77" cy="22" r="7"/><path d="M23 31 L35 48 L50 29 L65 48 L77 31 L69 70 H31Z"/><rect x="25" y="74" width="50" height="10" rx="3"/>`,
+ k:`<path d="M45 8 H55 V22 H68 V32 H55 V43 Q68 52 67 66 L76 82 H24 L33 66 Q32 52 45 43 V32 H32 V22 H45Z"/>`
+};
+const pieceNames={p:"Pion",n:"Kuda",b:"Gajah",r:"Benteng",q:"Ratu",k:"Raja"};
+
+function svgPiece(piece){
+ const color=piece.color==="w"?"white":"black";
+ return `<svg class="piece ${color}" viewBox="0 0 100 100" aria-label="${pieceNames[piece.type]}">
+ <g fill="currentColor" stroke="currentColor">${pieceShapes[piece.type]}</g></svg>`;
+}
+function squareName(r,c){return files[c]+(8-r)}
+function orient(r,c){return flipped?[7-r,7-c]:[r,c]}
+
+function renderBoard(){
+ const board=document.getElementById("board");
+ board.querySelectorAll(".square").forEach(x=>x.remove());
+ const ranks=document.getElementById("ranks"),fileLabels=document.getElementById("files");
+ ranks.innerHTML="";fileLabels.innerHTML="";
+ const matrix=game.board();
+ for(let r=0;r<8;r++){
+  const [rr]=orient(r,0);
+  const lab=document.createElement("div");lab.textContent=8-rr;ranks.appendChild(lab);
+ }
+ for(let c=0;c<8;c++){
+  const [,cc]=orient(0,c);
+  const lab=document.createElement("div");lab.textContent=files[cc].toUpperCase();fileLabels.appendChild(lab);
+ }
+ for(let r=0;r<8;r++){
+  for(let c=0;c<8;c++){
+   const [rr,cc]=orient(r,c);
+   const sq=document.createElement("div");
+   sq.className="square "+((rr+cc)%2===0?"light":"dark");
+   const name=squareName(rr,cc);
+   sq.dataset.square=name;
+   if(selected===name)sq.classList.add("selected");
+   if(targets.includes(name)){
+    sq.classList.add("target");
+    if(game.get(name))sq.classList.add("capture");
+   }
+   if(lastMove&&(lastMove.from===name||lastMove.to===name))sq.classList.add("last");
+   const piece=matrix[rr][cc];
+   if(piece)sq.innerHTML=svgPiece(piece);
+   sq.addEventListener("click",()=>clickSquare(name));
+   board.appendChild(sq);
+  }
+ }
+ drawArrow();
+ updateStatus();
+ updateHistory();
+}
+function drawArrow(){
+ const line=document.getElementById("arrowLine");
+ if(!lastMove||!lastMove.showArrow){line.setAttribute("visibility","hidden");return}
+ const a=coord(lastMove.from),b=coord(lastMove.to);
+ const x1=a.c*100+50,y1=a.r*100+50,x2=b.c*100+50,y2=b.r*100+50;
+ line.setAttribute("x1",x1);line.setAttribute("y1",y1);
+ line.setAttribute("x2",x2);line.setAttribute("y2",y2);
+ line.setAttribute("visibility","visible");
+}
+function coord(sq){
+ let c=files.indexOf(sq[0]),r=8-Number(sq[1]);
+ if(flipped){r=7-r;c=7-c}
+ return {r,c};
+}
+function updateStatus(){
+ let t="Giliran "+(game.turn()==="w"?"putih":"hitam");
+ if(game.in_checkmate())t="SKAKMAT! "+(game.turn()==="w"?"Hitam":"Putih")+" menang";
+ else if(game.in_check())t="⚠ SKAK! Raja sedang diserang";
+ else if(game.in_draw())t="Permainan seri";
+ document.getElementById("status").textContent=t;
+}
+function updateHistory(){
+ const moves=game.history();
+ document.getElementById("history").innerHTML=moves.length?
+ moves.map((m,i)=>(i%2===0?Math.floor(i/2)+1+". ":"")+m).join("  "):"Belum ada langkah.";
+}
+function sayMessage(t){document.getElementById("message").textContent=t}
+
+function clickSquare(sq){
+ if(engineBusy)return;
+ const piece=game.get(sq);
+ if(selected){
+  const move=game.move({from:selected,to:sq,promotion:"q"});
+  if(move){
+   afterMove(move);selected=null;targets=[];renderBoard();return;
+  }
+ }
+ if(piece&&piece.color===game.turn()){
+  selected=sq;
+  targets=game.moves({square:sq,verbose:true}).map(m=>m.to);
+ }else{selected=null;targets=[]}
+ renderBoard();
+}
+function afterMove(move){
+ lastMove={from:move.from,to:move.to,showArrow:false};
+ playSound(move.captured?"capture":"move");
+ if(game.in_check())playSound("check");
+ selected=null;targets=[];
+ clearRecommendations();
+ renderBoard();
+}
+function undoMove(){
+ if(engineBusy)return;
+ const m=game.undo();
+ if(m){lastMove=null;selected=null;targets=[];clearRecommendations();renderBoard()}
+}
+function resetGame(){
+ if(engineBusy&&engine)engine.postMessage("stop");
+ engineBusy=false;game.reset();selected=null;targets=[];lastMove=null;
+ clearRecommendations();renderBoard();sayMessage("Permainan baru dimulai.");
+}
+function flipBoard(){
+ flipped=!flipped;document.getElementById("side").value=flipped?"b":"w";
+ renderBoard();
+}
+document.getElementById("side").addEventListener("change",e=>{
+ flipped=e.target.value==="b";renderBoard();
+});
+
+function toggleSound(){
+ soundEnabled=!soundEnabled;
+ document.getElementById("soundButton").textContent=soundEnabled?"🔊 Suara aktif":"🔇 Suara mati";
+}
+function playSound(type){
+ if(!soundEnabled)return;
+ try{
+  const AC=window.AudioContext||window.webkitAudioContext;
+  if(!AC)return;
+  if(!audioCtx)audioCtx=new AC();
+  if(audioCtx.state==="suspended")audioCtx.resume();
+  const now=audioCtx.currentTime;
+  const notes=type==="check"?[740,920]:type==="capture"?[260,180]:[430];
+  notes.forEach((freq,i)=>{
+   const osc=audioCtx.createOscillator(),gain=audioCtx.createGain();
+   osc.type="sine";osc.frequency.value=freq;
+   gain.gain.setValueAtTime(.12,now+i*.09);
+   gain.gain.exponentialRampToValueAtTime(.001,now+i*.09+.16);
+   osc.connect(gain);gain.connect(audioCtx.destination);
+   osc.start(now+i*.09);osc.stop(now+i*.09+.17);
+  });
+ }catch(e){}
+}
+
+function clearRecommendations(){
+ document.getElementById("quickMove").textContent="Belum dianalisis";
+ document.getElementById("quickInfo").textContent="Tekan Analisis Posisi untuk mencari langkah.";
+ document.getElementById("recommendations").textContent="Belum ada rekomendasi.";
+}
+function initEngine(){
+ try{
+  engine=new Worker("./stockfish-19-lite-single.js");
+  engine.onmessage=e=>handleEngineMessage(String(e.data));
+  engine.onerror=()=>{
+   engineReady=false;
+   sayMessage("Stockfish gagal dimuat. Periksa file JS dan WASM.");
+  };
+  engine.postMessage("uci");
+ }catch(e){sayMessage("Browser tidak dapat menjalankan mesin catur.")}
+}
+function handleEngineMessage(msg){
+ if(msg==="uciok"){engine.postMessage("isready");return}
+ if(msg==="readyok"){engineReady=true;sayMessage("Mesin Stockfish siap.");return}
+ if(msg.startsWith("info ")&&engineBusy){parseInfo(msg);return}
+ if(msg.startsWith("bestmove ")&&engineBusy){
+  finishAnalysis(msg.split(/\s+/)[1]);
+ }
+}
+function parseInfo(line){
+ const mp=line.match(/\bmultipv\s+(\d+)/);
+ const pv=line.match(/\bpv\s+(.+)$/);
+ if(!pv)return;
+ const index=mp?Number(mp[1]):1;
+ const scoreMate=line.match(/\bscore mate (-?\d+)/);
+ const scoreCp=line.match(/\bscore cp (-?\d+)/);
+ const depth=line.match(/\bdepth (\d+)/);
+ analysisLines[index]={
+  pv:pv[1].trim().split(/\s+/),
+  mate:scoreMate?Number(scoreMate[1]):null,
+  cp:scoreCp?Number(scoreCp[1]):null,
+  depth:depth?Number(depth[1]):0
+ };
+}
+function moveDescription(uci){
+ const from=uci.slice(0,2),to=uci.slice(2,4);
+ const piece=game.get(from);
+ return (piece?pieceNames[piece.type]:"Bidak")+": "+from.toUpperCase()+" ➜ "+to.toUpperCase();
+}
+function formatScore(line){
+ if(line.mate!==null)return line.mate>=0?"Skakmat dalam "+line.mate+" langkah":"Terancam skakmat";
+ if(line.cp!==null)return "Evaluasi "+(line.cp/100).toFixed(2);
+ return "Evaluasi belum tersedia";
+}
+function analyzePosition(){
+ if(engineBusy){sayMessage("Analisis sedang berjalan.");return}
+ if(!engineReady){sayMessage("Mesin belum siap. Tunggu sebentar.");return}
+ if(game.game_over()){sayMessage("Permainan sudah selesai.");return}
+ selected=null;targets=[];lastMove=null;renderBoard();
+ analysisLines={};
+ engineBusy=true;
+ document.getElementById("analyzeButton").disabled=true;
+ document.getElementById("quickMove").textContent="Sedang menganalisis...";
+ document.getElementById("quickInfo").textContent="Mohon tunggu.";
+ document.getElementById("recommendations").textContent="Stockfish sedang mencari langkah terbaik...";
+ const fen=game.fen();
+ engine.postMessage("stop");
+ engine.postMessage("ucinewgame");
+ engine.postMessage("isready");
+ engine.postMessage("position fen "+fen);
+ engine.postMessage("setoption name MultiPV value 3");
+ engine.postMessage("go movetime "+document.getElementById("speed").value);
+}
+function finishAnalysis(bestmove){
+ engineBusy=false;
+ document.getElementById("analyzeButton").disabled=false;
+ if(!bestmove||bestmove==="(none)"){
+  sayMessage("Tidak ada langkah yang tersedia.");
+  document.getElementById("quickMove").textContent="Tidak ada langkah";
+  return;
+ }
+ const lines=Object.values(analysisLines).sort((a,b)=>a.mate!==null&&b.mate!==null?Math.abs(a.mate)-Math.abs(b.mate):a.mate!==null?-1:b.mate!==null?1:(b.cp||0)-(a.cp||0));
+ const chosen=bestmove;
+ const from=chosen.slice(0,2),to=chosen.slice(2,4);
+ const description=moveDescription(chosen);
+ document.getElementById("quickMove").textContent=description;
+ document.getElementById("quickInfo").textContent="Langkah rekomendasi utama langsung diterapkan.";
+ showRecommendations(lines,chosen);
+ const promotion=chosen.length>4?chosen[4]:"q";
+ const move=game.move({from,to,promotion});
+ if(move){
+  lastMove={from,to,showArrow:true};
+  playSound(move.captured?"capture":"move");
+  if(game.in_check())playSound("check");
+  selected=null;targets=[];
+  renderBoard();
+  sayMessage("Rekomendasi nomor 1 sudah dimainkan.");
+ }else{
+  sayMessage("Langkah dari mesin tidak dapat diterapkan. Coba analisis ulang.");
+ }
+}
+function showRecommendations(lines,bestmove){
+ const box=document.getElementById("recommendations");
+ let html="";
+ const all=[{pv:[bestmove],mate:null,cp:null},...lines.filter(x=>x.pv[0]!==bestmove)];
+ const unique=[];
+ all.forEach(x=>{if(x.pv[0]&&!unique.some(y=>y.pv[0]===x.pv[0]))unique.push(x)});
+ unique.slice(0,3).forEach((line,i)=>{
+  const uci=line.pv[0];
+  const from=uci.slice(0,2),to=uci.slice(2,4);
+  const piece=game.get(from);
+  const name=piece?pieceNames[piece.type]:"Bidak";
+  const text=name+": "+from.toUpperCase()+" ➜ "+to.toUpperCase();
+  html+=`<div class="recommendation">
+   <div class="rec-title">${i===0?"★ REKOMENDASI UTAMA":"REKOMENDASI "+(i+1)}</div>
+   <div class="rec-move">${text}</div>
+   <div class="rec-detail">${i===0?"Langkah yang langsung diterapkan ke papan.":formatScore(line)}</div>
+  </div>`;
+ });
+ box.innerHTML=html||"Rekomendasi tidak tersedia.";
+}
+function loadFEN(){
+ if(engineBusy)return;
+ const fen=document.getElementById("fen").value.trim();
+ if(!fen){sayMessage("Masukkan FEN terlebih dahulu.");return}
+ if(game.load(fen)){
+  selected=null;targets=[];lastMove=null;clearRecommendations();renderBoard();
+  sayMessage("Posisi FEN berhasil dimuat.");
+ }else sayMessage("FEN tidak valid.");
+}
+renderBoard();
+initEngine();
+</script>
+</body>
+  </html>
