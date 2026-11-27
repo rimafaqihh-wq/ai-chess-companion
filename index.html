@@ -155,6 +155,19 @@ button:disabled{opacity:.5}
  font-size:11px;
 }
 
+
+/* KAMERA LANGSUNG */
+.camera-panel{margin:0 0 14px;padding:12px;background:#241e25;border:1px solid #493943;border-radius:12px}
+.camera-panel h2{font-size:15px;margin:0 0 8px}
+.camera-video-wrap{position:relative;width:100%;aspect-ratio:4/3;background:#100d12;border-radius:9px;overflow:hidden;display:none}
+.camera-video-wrap.active{display:block}
+#liveCamera{width:100%;height:100%;object-fit:contain;background:#100d12}
+.camera-placeholder{display:grid;place-items:center;min-height:115px;text-align:center;color:#bcaeb5;font-size:12px;line-height:1.5;padding:14px}
+.camera-buttons{display:flex;gap:8px;margin-top:9px}
+.camera-buttons button{flex:1}
+#cameraStart{background:#8e5d3c;border-color:#a77a59}
+.camera-status{font-size:11px;color:#c9b9c0;line-height:1.5;margin-top:8px}
+
 @media(min-width:500px){
  body{padding:20px}
 }
@@ -173,6 +186,23 @@ button:disabled{opacity:.5}
    </select>
    <button id="sound" aria-label="Suara" title="Hidupkan atau matikan suara">🔊</button>
   </div>
+ </div>
+
+
+ <div class="camera-panel">
+  <h2>AI Chess Vision</h2>
+  <div id="cameraPlaceholder" class="camera-placeholder">
+   Kamera langsung untuk melihat papan catur fisik atau layar perangkat lain.
+  </div>
+  <div id="cameraVideoWrap" class="camera-video-wrap">
+   <video id="liveCamera" autoplay muted playsinline></video>
+  </div>
+  <div class="camera-buttons">
+   <button id="cameraStart">Mulai Kamera</button>
+   <button id="cameraSwitch" disabled>Balik Kamera</button>
+   <button id="cameraStop" disabled>Matikan</button>
+  </div>
+  <div id="cameraStatus" class="camera-status">Kamera belum aktif. Izinkan akses kamera saat diminta.</div>
  </div>
 
  <div class="board-wrap">
@@ -1037,6 +1067,82 @@ async function analyzePosition(){
 }
 
 analyzeBtn.addEventListener("click",analyzePosition);
+
+
+// =====================================
+// KAMERA LANGSUNG - AI CHESS VISION
+// =====================================
+const cameraVideo = document.getElementById("liveCamera");
+const cameraWrap = document.getElementById("cameraVideoWrap");
+const cameraPlaceholder = document.getElementById("cameraPlaceholder");
+const cameraStatus = document.getElementById("cameraStatus");
+const cameraStartBtn = document.getElementById("cameraStart");
+const cameraSwitchBtn = document.getElementById("cameraSwitch");
+const cameraStopBtn = document.getElementById("cameraStop");
+let cameraStream = null;
+let cameraFacing = "environment";
+let cameraBusy = false;
+
+async function startLiveCamera(){
+ if(cameraBusy)return;
+ cameraBusy=true;
+ cameraStartBtn.disabled=true;
+ cameraStatus.textContent="Menghubungkan kamera...";
+ try{
+  if(!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia){
+   throw new Error("Browser ini tidak mendukung kamera langsung. Buka aplikasi melalui alamat HTTPS di Safari.");
+  }
+  if(cameraStream){
+   cameraStream.getTracks().forEach(track=>track.stop());
+   cameraStream=null;
+  }
+  cameraStream=await navigator.mediaDevices.getUserMedia({
+   audio:false,
+   video:{facingMode:{ideal:cameraFacing},width:{ideal:1280},height:{ideal:720}}
+  });
+  cameraVideo.srcObject=cameraStream;
+  await cameraVideo.play();
+  cameraPlaceholder.style.display="none";
+  cameraWrap.classList.add("active");
+  cameraSwitchBtn.disabled=false;
+  cameraStopBtn.disabled=false;
+  cameraStatus.textContent="Kamera aktif. Arahkan ke papan catur dan pastikan seluruh papan terlihat. Pengenalan bidak otomatis akan menjadi tahap berikutnya.";
+ }catch(error){
+  cameraStatus.textContent=error.name==="NotAllowedError"
+   ?"Izin kamera ditolak. Izinkan akses kamera untuk situs ini melalui pengaturan Safari."
+   :(error.message||"Kamera tidak dapat diaktifkan.");
+  if(cameraStream){
+   cameraStream.getTracks().forEach(track=>track.stop());
+   cameraStream=null;
+  }
+ }finally{
+  cameraBusy=false;
+  cameraStartBtn.disabled=false;
+ }
+}
+
+function stopLiveCamera(){
+ if(cameraStream){
+  cameraStream.getTracks().forEach(track=>track.stop());
+  cameraStream=null;
+ }
+ cameraVideo.srcObject=null;
+ cameraWrap.classList.remove("active");
+ cameraPlaceholder.style.display="grid";
+ cameraSwitchBtn.disabled=true;
+ cameraStopBtn.disabled=true;
+ cameraStatus.textContent="Kamera dimatikan.";
+}
+
+cameraStartBtn.addEventListener("click",startLiveCamera);
+cameraStopBtn.addEventListener("click",stopLiveCamera);
+cameraSwitchBtn.addEventListener("click",async()=>{
+ cameraFacing=cameraFacing==="environment"?"user":"environment";
+ await startLiveCamera();
+});
+window.addEventListener("pagehide",()=>{
+ if(cameraStream)cameraStream.getTracks().forEach(track=>track.stop());
+});
 
 // =====================================
 // MULAI APLIKASI
