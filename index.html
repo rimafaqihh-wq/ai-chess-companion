@@ -278,70 +278,88 @@ const symbols = {
 };
 
 // =====================================
-// SISTEM SUARA UNIVERSAL
+// SISTEM SUARA UNIVERSAL - DIPERBAIKI
 // =====================================
 
-function unlockAudio(){
+function createAudio(){
  try{
   const AudioAPI =
    window.AudioContext ||
    window.webkitAudioContext;
 
-  if(!AudioAPI)return Promise.resolve(false);
+  if(!AudioAPI)return false;
 
   if(!audioContext){
    audioContext = new AudioAPI();
 
    masterGain = audioContext.createGain();
 
-   // Volume aplikasi penuh; volume akhir mengikuti perangkat
+   // Volume aplikasi tidak membatasi volume perangkat
    masterGain.gain.value = 1.0;
 
    masterGain.connect(audioContext.destination);
+
+   audioContext.onstatechange=()=>{
+    audioUnlocked=audioContext.state==="running";
+   };
   }
 
-  if(audioContext.state === "running"){
-   audioUnlocked = true;
-   return Promise.resolve(true);
+  return true;
+
+ }catch(error){
+  console.warn("Audio tidak tersedia:",error);
+  return false;
   }
+}
 
-  if(audioStarting){
-   return audioStarting;
-  }
+function unlockAudio(){
+ if(!createAudio()){
+  return Promise.resolve(false);
+ }
 
-  // Resume dipanggil langsung dari interaksi pengguna
-  const resumePromise = audioContext.resume();
+ if(audioContext.state==="running"){
+  audioUnlocked=true;
+  return Promise.resolve(true);
+ }
 
-  audioStarting = resumePromise.then(()=>{
-   audioUnlocked = audioContext.state === "running";
+ if(audioStarting){
+  return audioStarting;
+ }
+
+ try{
+  // Resume dipanggil langsung saat interaksi pengguna
+  const resume=audioContext.resume();
+
+  audioStarting=resume.then(()=>{
+   audioUnlocked=audioContext.state==="running";
    return audioUnlocked;
   }).catch(error=>{
    console.warn("Audio gagal diaktifkan:",error);
-   audioUnlocked = false;
+   audioUnlocked=false;
    return false;
   }).finally(()=>{
-   audioStarting = null;
+   audioStarting=null;
   });
 
   return audioStarting;
 
  }catch(error){
-  console.warn("Audio tidak tersedia:",error);
-  audioUnlocked = false;
+  console.warn("Audio gagal diaktifkan:",error);
+  audioUnlocked=false;
   return Promise.resolve(false);
  }
 }
 
-function tone(freq,duration,delay=0,volume=0.20){
- if(!soundEnabled || !audioUnlocked || !audioContext || !masterGain)return;
+function playToneNow(freq,duration,delay,volume){
+ if(!soundEnabled || !audioContext || !masterGain)return;
 
  try{
-  const start = audioContext.currentTime + delay;
+  const start=audioContext.currentTime+delay;
 
-  const oscillator = audioContext.createOscillator();
-  const gain = audioContext.createGain();
+  const oscillator=audioContext.createOscillator();
+  const gain=audioContext.createGain();
 
-  oscillator.type = "sine";
+  oscillator.type="sine";
   oscillator.frequency.setValueAtTime(freq,start);
 
   gain.gain.setValueAtTime(0.0001,start);
@@ -363,11 +381,35 @@ function tone(freq,duration,delay=0,volume=0.20){
  }
 }
 
+function tone(freq,duration,delay=0,volume=0.20){
+ if(!soundEnabled)return;
+
+ if(!createAudio())return;
+
+ if(audioContext.state==="running"){
+  audioUnlocked=true;
+  playToneNow(freq,duration,delay,volume);
+  return;
+ }
+
+ // Jika audio masih tertahan, aktifkan lalu mainkan nada
+ unlockAudio().then(ready=>{
+  if(ready && soundEnabled){
+   playToneNow(freq,duration,delay,volume);
+  }
+ });
+}
+
 function playSound(type){
  if(!soundEnabled)return;
 
- unlockAudio().then(ready=>{
-  if(!ready || !soundEnabled)return;
+ // Pastikan AudioContext sudah dibuat
+ if(!createAudio())return;
+
+ const play=()=>{
+  if(!soundEnabled || audioContext.state!=="running")return;
+
+  audioUnlocked=true;
 
   if(type==="capture"){
    tone(350,0.13,0,0.40);
@@ -377,14 +419,26 @@ function playSound(type){
    tone(850,0.13,0,0.42);
    tone(1100,0.18,0.16,0.42);
 
+  }else if(type==="test"){
+   tone(700,0.16,0,0.30);
+
   }else{
    tone(620,0.11,0,0.35);
   }
- });
+ };
+
+ if(audioContext.state==="running"){
+  play();
+ }else{
+  unlockAudio().then(ready=>{
+   if(ready)play();
+  });
+ }
 }
 
 function prepareAudio(){
  if(soundEnabled){
+  // Resume dilakukan langsung dalam interaksi pengguna
   unlockAudio();
  }
 }
@@ -426,11 +480,14 @@ soundBtn.addEventListener("click",()=>{
   soundBtn.classList.remove("off");
   soundBtn.setAttribute("aria-label","Matikan suara");
 
-  unlockAudio().then(ready=>{
-   if(ready && soundEnabled){
-    tone(700,0.12,0,0.20);
-   }
-  });
+  // Aktifkan audio dan mainkan suara tes
+  if(createAudio()){
+   unlockAudio().then(ready=>{
+    if(ready && soundEnabled){
+     playSound("test");
+    }
+   });
+  }
  }
 });
 
