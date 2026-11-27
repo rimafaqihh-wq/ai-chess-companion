@@ -65,6 +65,7 @@ select{max-width:125px}
 }
 .piece.white{
  color:#addfff;
+ -webkit-text-fill-color:#addfff;
  -webkit-text-stroke:1.6px #fff;
  text-shadow:0 1px 1px #52758c,1px 2px 2px #52758c;
 }
@@ -151,6 +152,7 @@ button:disabled{opacity:.5}
    <option value="1000">Cepat</option>
    <option value="3000" selected>Seimbang</option>
    <option value="7000">Lebih Teliti</option>
+   <option value="mate">Checkmate Cepat</option>
   </select>
   <button id="analyze">Analisis Posisi</button>
  </div>
@@ -695,12 +697,31 @@ function describeLine(line,fen){
  return moves.join(" ");
 }
 
-function moveArrow(line){
+function pieceNameAt(fen,square){
+ const temp=new Chess(fen);
+ const piece=temp.get(square);
+
+ if(!piece)return "Bidak";
+
+ const names={
+  k:"Raja",
+  q:"Ratu",
+  r:"Benteng (Tank)",
+  b:"Gajah (Bishop)",
+  n:"Kuda",
+  p:"Pion"
+ };
+
+ return names[piece.type]||"Bidak";
+}
+
+function moveArrow(line,fen){
  if(!line || !line.pv || !line.pv.length)return "";
 
  const move=uciToMove(line.pv[0]);
+ const name=pieceNameAt(fen,move.from);
 
- return move.from+" → "+move.to;
+ return name+": "+move.from+" → "+move.to;
 }
 
 function stopAnalysis(){
@@ -750,11 +771,12 @@ async function analyzePosition(){
 
   engineBusy=true;
 
-  engine.postMessage("setoption name MultiPV value 3");
+  const mateMode=levelEl.value==="mate";
+  const movetime=mateMode?15000:Number(levelEl.value);
+  const multiPV=mateMode?5:3;
+
+  engine.postMessage("setoption name MultiPV value "+multiPV);
   engine.postMessage("position fen "+originalFen);
-
-  const movetime=Number(levelEl.value);
-
   engine.postMessage("go movetime "+movetime);
 
   const bestMove=await new Promise((resolve,reject)=>{
@@ -799,7 +821,7 @@ async function analyzePosition(){
   let recommendationHTML="";
 
   lines.slice(0,3).forEach((line,index)=>{
-   const arrow=moveArrow(line);
+   const arrow=moveArrow(line,originalFen);
 
    recommendationHTML+=
     '<div class="recommendation"><strong>Rekomendasi '+
@@ -813,10 +835,12 @@ async function analyzePosition(){
 
   if(!recommendationHTML){
    const fallbackMove=uciToMove(bestMove);
+   const fallbackName=pieceNameAt(originalFen,fallbackMove.from);
 
    recommendationHTML=
     '<div class="recommendation"><strong>Rekomendasi 1</strong><br>'+
-    '<strong>Arah langkah: '+fallbackMove.from+' → '+fallbackMove.to+
+    '<strong>Arah langkah: '+fallbackName+': '+
+    fallbackMove.from+' → '+fallbackMove.to+
     '</strong><br>Langkah terbaik ditemukan.</div>';
   }
 
@@ -825,7 +849,12 @@ async function analyzePosition(){
     '<div class="recommendation"><strong>Jalur CHECKMATE tercepat ditemukan!</strong><br>'+
     scoreText(selectedLine.score)+
     '<br><span class="small">Langkah pertama: '+
-    moveArrow(selectedLine)+'</span></div>'+
+    moveArrow(selectedLine,originalFen)+'</span></div>'+
+    recommendationHTML;
+  }else if(mateMode){
+   recommendationsEl.innerHTML=
+    '<div class="recommendation"><strong>Pencarian Checkmate selesai.</strong><br>'+
+    'Belum ditemukan jalur Checkmate paksa dalam pencarian ini.</div>'+
     recommendationHTML;
   }else{
    recommendationsEl.innerHTML=recommendationHTML;
