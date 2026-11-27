@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="id">
 <head>
@@ -64,9 +65,9 @@ select{max-width:125px}
  -webkit-text-stroke:1px rgba(0,0,0,.35);
 }
 .piece.white{
- color:#addfff;
- -webkit-text-fill-color:#addfff;
- -webkit-text-stroke:1.6px #fff;
+ color:#bfe8ff;
+ -webkit-text-fill-color:#bfe8ff;
+ -webkit-text-stroke:2.2px #fff;
  text-shadow:0 1px 1px #52758c,1px 2px 2px #52758c;
 }
 .piece.black{
@@ -495,27 +496,28 @@ function updateGameStatus(){
  if(game.in_checkmate()){
   const winner=game.turn()==="w"?"Hitam":"Putih";
   statusEl.textContent=
-   "CHECKMATE! Permainan selesai. Pemenangnya: "+winner+".";
+   "PERMAINAN BERAKHIR: CHECKMATE! Raja "+(game.turn()==="w"?"Putih":"Hitam")+
+   " terkena skakmat. Pemenangnya adalah "+winner+".";
 
  }else if(game.in_stalemate()){
   statusEl.textContent=
-   "DRAW! Permainan remis karena Stalemate.";
+   "PERMAINAN BERAKHIR: REMIS karena Stalemate. Pemain yang mendapat giliran tidak memiliki langkah legal, tetapi rajanya tidak sedang diskak.";
 
  }else if(game.insufficient_material()){
   statusEl.textContent=
-   "DRAW! Permainan remis karena materi bidak tidak cukup.";
+   "PERMAINAN BERAKHIR: REMIS karena materi bidak tidak cukup untuk melakukan checkmate.";
 
  }else if(game.in_threefold_repetition()){
   statusEl.textContent=
-   "DRAW! Permainan remis karena pengulangan posisi tiga kali.";
+   "PERMAINAN BERAKHIR: REMIS karena posisi yang sama telah terulang tiga kali.";
 
  }else if(Number(game.fen().split(" ")[4])>=100){
   statusEl.textContent=
-   "DRAW! Permainan remis karena aturan 50 langkah.";
+   "PERMAINAN BERAKHIR: REMIS karena aturan 50 langkah tanpa pemindahan pion atau pemakanan bidak.";
 
  }else if(game.in_draw()){
   statusEl.textContent=
-   "DRAW! Permainan remis berdasarkan aturan catur.";
+   "PERMAINAN BERAKHIR: REMIS berdasarkan aturan permainan catur.";
 
  }else if(game.in_check()){
   statusEl.textContent="Skak! Raja sedang dalam ancaman.";
