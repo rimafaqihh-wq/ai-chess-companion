@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="id">
 <head>
@@ -898,8 +899,8 @@ async function analyzePosition(){
 
   const mateMode=levelEl.value==="mate";
 
-  // CHECKMATE CEPAT: 0,3 DETIK
-  const movetime=mateMode?300:Number(levelEl.value);
+  // SEMUA MODE ANALISIS: 0,1 DETIK
+  const movetime=100;
 
   const multiPV=mateMode?5:3;
 
