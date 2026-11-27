@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="id">
 <head>
@@ -294,7 +293,10 @@ function unlockAudio(){
    audioContext = new AudioAPI();
 
    masterGain = audioContext.createGain();
-   masterGain.gain.value = 0.7;
+
+   // Volume aplikasi penuh; volume akhir mengikuti perangkat
+   masterGain.gain.value = 1.0;
+
    masterGain.connect(audioContext.destination);
   }
 
@@ -307,7 +309,10 @@ function unlockAudio(){
    return audioStarting;
   }
 
-  audioStarting = audioContext.resume().then(()=>{
+  // Resume dipanggil langsung dari interaksi pengguna
+  const resumePromise = audioContext.resume();
+
+  audioStarting = resumePromise.then(()=>{
    audioUnlocked = audioContext.state === "running";
    return audioUnlocked;
   }).catch(error=>{
@@ -888,7 +893,10 @@ async function analyzePosition(){
   engineBusy=true;
 
   const mateMode=levelEl.value==="mate";
-  const movetime=mateMode?500:Number(levelEl.value);
+
+  // CHECKMATE CEPAT: 0,3 DETIK
+  const movetime=mateMode?300:Number(levelEl.value);
+
   const multiPV=mateMode?5:3;
 
   engine.postMessage("setoption name MultiPV value "+multiPV);
