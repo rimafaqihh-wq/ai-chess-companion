@@ -223,7 +223,7 @@ function unlockAudio(){
    audioContext = new AudioAPI();
 
    masterGain = audioContext.createGain();
-   masterGain.gain.value = 1.0;
+   masterGain.gain.value = 0.7;
    masterGain.connect(audioContext.destination);
   }
 
