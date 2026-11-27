@@ -167,6 +167,14 @@ button:disabled{opacity:.5}
 .camera-buttons button{flex:1}
 #cameraStart{background:#8e5d3c;border-color:#a77a59}
 .camera-status{font-size:11px;color:#c9b9c0;line-height:1.5;margin-top:8px}
+/* Saat kamera aktif, kamera menggantikan area papan catur */
+.app.camera-active .board-wrap{display:none}
+.app.camera-active .camera-panel{margin-bottom:14px}
+.app.camera-active .camera-panel h2,
+.app.camera-active .camera-placeholder{display:none}
+.app.camera-active .camera-video-wrap{aspect-ratio:1}
+.app.camera-active #liveCamera{object-fit:contain}
+
 
 @media(min-width:500px){
  body{padding:20px}
@@ -1104,6 +1112,7 @@ async function startLiveCamera(){
   await cameraVideo.play();
   cameraPlaceholder.style.display="none";
   cameraWrap.classList.add("active");
+  document.querySelector(".app").classList.add("camera-active");
   cameraSwitchBtn.disabled=false;
   cameraStopBtn.disabled=false;
   cameraStatus.textContent="Kamera aktif. Arahkan ke papan catur dan pastikan seluruh papan terlihat. Pengenalan bidak otomatis akan menjadi tahap berikutnya.";
@@ -1128,6 +1137,7 @@ function stopLiveCamera(){
  }
  cameraVideo.srcObject=null;
  cameraWrap.classList.remove("active");
+ document.querySelector(".app").classList.remove("camera-active");
  cameraPlaceholder.style.display="grid";
  cameraSwitchBtn.disabled=true;
  cameraStopBtn.disabled=true;
