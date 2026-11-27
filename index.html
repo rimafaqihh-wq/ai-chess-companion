@@ -293,30 +293,34 @@ function unlockAudio(){
 
   if(!audioContext){
    audioContext = new AudioAPI();
-   masterGain = audioContext.createGain();
 
-   // Mengikuti volume media perangkat
+   masterGain = audioContext.createGain();
    masterGain.gain.value = 1.0;
    masterGain.connect(audioContext.destination);
   }
+
+  if(audioStarting)return audioStarting;
 
   if(audioContext.state === "running"){
    audioUnlocked = true;
    return Promise.resolve(true);
   }
 
-  const resumePromise = audioContext.resume();
+  audioStarting = audioContext.resume()
+   .then(()=>{
+    audioUnlocked = audioContext.state === "running";
+    return audioUnlocked;
+   })
+   .catch(error=>{
+    console.warn("Audio gagal diaktifkan:",error);
+    audioUnlocked = false;
+    return false;
+   })
+   .finally(()=>{
+    audioStarting = null;
+   });
 
-  audioUnlocked = true;
-
-  return resumePromise.then(()=>{
-   audioUnlocked = audioContext.state === "running";
-   return audioUnlocked;
-  }).catch(error=>{
-   console.warn("Audio gagal diaktifkan:",error);
-   audioUnlocked = false;
-   return false;
-  });
+  return audioStarting;
 
  }catch(error){
   console.warn("Audio tidak tersedia:",error);
@@ -327,6 +331,7 @@ function unlockAudio(){
 
 function tone(freq,duration,delay=0,volume=0.20){
  if(!soundEnabled || !audioContext || !masterGain)return;
+ if(audioContext.state !== "running")return;
 
  try{
   const start = audioContext.currentTime + delay;
@@ -398,7 +403,7 @@ document.addEventListener(
 );
 
 document.addEventListener(
- "touchstart",
+ "touchend",
  prepareAudio,
  {capture:true,passive:true}
 );
@@ -415,8 +420,7 @@ document.addEventListener("visibilitychange",()=>{
  }
 });
 
-soundBtn.addEventListener("click",()=>{
- // Jika audio belum aktif, tekan pertama untuk mengaktifkan
+soundBtn.addEventListener("click",async()=>{
  if(!soundEnabled || !audioUnlocked){
   soundEnabled=true;
 
@@ -424,11 +428,11 @@ soundBtn.addEventListener("click",()=>{
   soundBtn.classList.remove("off");
   soundBtn.setAttribute("aria-label","Matikan suara");
 
-  unlockAudio().then(ready=>{
-   if(ready && soundEnabled){
-    tone(700,0.16,0,0.35);
-   }
-  });
+  const ready=await unlockAudio();
+
+  if(ready && soundEnabled){
+   tone(700,0.16,0,0.35);
+  }
 
  }else{
   soundEnabled=false;
