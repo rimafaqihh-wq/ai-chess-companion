@@ -128,7 +128,7 @@ button:disabled{opacity:.5}
     <option value="w">Putih</option>
     <option value="b">Hitam</option>
    </select>
-   <button id="sound" aria-label="Suara">🔊</button>
+   <button id="sound" aria-label="Suara" title="Hidupkan atau matikan suara">🔊</button>
   </div>
  </div>
 
@@ -181,8 +181,11 @@ const historyEl = document.getElementById("history");
 let orientation = "w";
 let selectedSquare = null;
 let legalMoves = [];
+
 let soundEnabled = true;
 let audioContext = null;
+let masterGain = null;
+let audioUnlocked = false;
 
 let engine = null;
 let engineReady = false;
@@ -197,57 +200,145 @@ const symbols = {
  k:"♚",q:"♛",r:"♜",b:"♝",n:"♞",p:"♟"
 };
 
-function unlockAudio(){
+// =====================================
+// SISTEM SUARA UNIVERSAL
+// Android, iPhone, Windows, Mac
+// Chrome, Safari, Edge, Firefox
+// =====================================
+
+async function unlockAudio(){
  try{
+  const AudioAPI =
+   window.AudioContext ||
+   window.webkitAudioContext;
+
+  if(!AudioAPI)return false;
+
   if(!audioContext){
-   const AC = window.AudioContext || window.webkitAudioContext;
-   if(AC) audioContext = new AC();
+   audioContext = new AudioAPI();
+
+   masterGain = audioContext.createGain();
+   masterGain.gain.value = 0.7;
+   masterGain.connect(audioContext.destination);
   }
-  if(audioContext && audioContext.state === "suspended"){
-   audioContext.resume();
+
+  if(audioContext.state !== "running"){
+   await audioContext.resume();
   }
- }catch(e){}
+
+  audioUnlocked = audioContext.state === "running";
+  return audioUnlocked;
+
+ }catch(error){
+  console.warn("Audio gagal diaktifkan:",error);
+  audioUnlocked = false;
+  return false;
 }
 
-function tone(freq,duration,delay=0){
- if(!soundEnabled)return;
- unlockAudio();
- if(!audioContext)return;
-
- const start = audioContext.currentTime + delay;
- const osc = audioContext.createOscillator();
- const gain = audioContext.createGain();
-
- osc.type = "sine";
- osc.frequency.value = freq;
- gain.gain.setValueAtTime(.0001,start);
- gain.gain.exponentialRampToValueAtTime(.12,start+.015);
- gain.gain.exponentialRampToValueAtTime(.0001,start+duration);
-
- osc.connect(gain);
- gain.connect(audioContext.destination);
- osc.start(start);
- osc.stop(start+duration+.03);
 }
 
-function playSound(type){
- if(type==="capture"){
-  tone(350,.12);
-  tone(260,.15,.14);
- }else if(type==="check"){
-  tone(850,.12);
-  tone(1100,.18,.15);
- }else{
-  tone(620,.09);
+function tone(freq,duration,delay=0,volume=0.20){
+ if(!soundEnabled || !audioUnlocked || !audioContext)return;
+
+ try{
+  const start = audioContext.currentTime + delay;
+
+  const oscillator = audioContext.createOscillator();
+  const gain = audioContext.createGain();
+
+  oscillator.type = "sine";
+  oscillator.frequency.setValueAtTime(freq,start);
+
+  gain.gain.setValueAtTime(0.0001,start);
+  gain.gain.exponentialRampToValueAtTime(
+   volume,start+0.025
+  );
+  gain.gain.exponentialRampToValueAtTime(
+   0.0001,start+duration
+  );
+
+  oscillator.connect(gain);
+  gain.connect(masterGain);
+
+  oscillator.start(start);
+  oscillator.stop(start+duration+0.04);
+
+ }catch(error){
+  console.warn("Nada gagal dimainkan:",error);
  }
 }
 
-soundBtn.addEventListener("click",()=>{
+async function playSound(type){
+ if(!soundEnabled)return;
+
+ const ready = await unlockAudio();
+ if(!ready || !soundEnabled)return;
+
+ if(type==="capture"){
+  // Suara ketika memakan bidak
+  tone(350,0.13,0,0.23);
+  tone(250,0.17,0.16,0.23);
+
+ }else if(type==="check"){
+  // Suara ketika raja terkena skak
+  tone(850,0.13,0,0.24);
+  tone(1100,0.18,0.16,0.24);
+
+ }else{
+  // Suara ketika bidak bergerak
+  tone(620,0.11,0,0.20);
+ }
+}
+
+// Aktifkan audio saat interaksi pertama.
+// Mendukung mouse, layar sentuh, dan keyboard.
+function prepareAudio(){
  unlockAudio();
- soundEnabled = !soundEnabled;
- soundBtn.textContent = soundEnabled ? "🔊" : "🔇";
- soundBtn.classList.toggle("off",!soundEnabled);
+}
+
+document.addEventListener(
+ "pointerdown",
+ prepareAudio,
+ {capture:true}
+);
+
+document.addEventListener(
+ "touchstart",
+ prepareAudio,
+ {capture:true,passive:true}
+);
+
+document.addEventListener(
+ "keydown",
+ prepareAudio,
+ {capture:true}
+);
+
+// Tombol suara
+soundBtn.addEventListener("click",async()=>{
+ if(soundEnabled){
+  soundEnabled=false;
+  soundBtn.textContent="🔇";
+  soundBtn.classList.add("off");
+  soundBtn.setAttribute("aria-label","Hidupkan suara");
+
+ }else{
+  soundEnabled=true;
+  soundBtn.textContent="🔊";
+  soundBtn.classList.remove("off");
+  soundBtn.setAttribute("aria-label","Matikan suara");
+
+  const ready=await unlockAudio();
+
+  if(ready){
+   tone(700,0.12,0,0.20);
+  }
+ }
 });
+
+// =====================================
+// PAPAN CATUR
+// =====================================
 
 function renderBoard(){
  boardEl.innerHTML = "";
@@ -276,8 +367,9 @@ function renderBoard(){
    if(piece){
     const span = document.createElement("span");
     span.className = "piece "+(piece.color==="w"?"white":"black");
-    span.textContent = symbols[piece.type==="k"?"K".toLowerCase()===piece.type?piece.type:piece.type:piece.type];
-    span.textContent = symbols[piece.color==="w"?piece.type.toUpperCase():piece.type];
+    span.textContent = symbols[
+     piece.color==="w" ? piece.type.toUpperCase() : piece.type
+    ];
     square.appendChild(span);
    }
 
@@ -285,40 +377,31 @@ function renderBoard(){
     square.classList.add("checked-king");
    }
 
-   if(orientation==="w"){
-    if(row===7){
-     const f=document.createElement("span");
-     f.className="coord file";
-     f.textContent="abcdefgh"[file];
-     square.appendChild(f);
-    }
-    if(col===0){
-     const r=document.createElement("span");
-     r.className="coord rank";
-     r.textContent=rank;
-     square.appendChild(r);
-    }
-   }else{
-    if(row===7){
-     const f=document.createElement("span");
-     f.className="coord file";
-     f.textContent="abcdefgh"[file];
-     square.appendChild(f);
-    }
-    if(col===0){
-     const r=document.createElement("span");
-     r.className="coord rank";
-     r.textContent=rank;
-     square.appendChild(r);
-    }
+   if(row===7){
+    const f=document.createElement("span");
+    f.className="coord file";
+    f.textContent="abcdefgh"[file];
+    square.appendChild(f);
+   }
+
+   if(col===0){
+    const r=document.createElement("span");
+    r.className="coord rank";
+    r.textContent=rank;
+    square.appendChild(r);
    }
 
    square.addEventListener("click",()=>handleSquareClick(squareName));
    boardEl.appendChild(square);
   }
  }
+
  updateHistory();
 }
+
+// =====================================
+// GERAKAN BIDAK
+// =====================================
 
 function handleSquareClick(square){
  unlockAudio();
@@ -331,7 +414,6 @@ function handleSquareClick(square){
   const move = legalMoves.find(m=>m.to===square);
 
   if(move){
-   const before = game.get(move.to);
    const result = game.move({
     from:selectedSquare,
     to:square,
@@ -360,30 +442,44 @@ function handleSquareClick(square){
  renderBoard();
 }
 
+// =====================================
+// RIWAYAT DAN STATUS
+// =====================================
+
 function updateHistory(){
  const history = game.history();
+
  if(!history.length){
   historyEl.textContent="Belum ada langkah.";
   return;
  }
 
  let output="";
+
  for(let i=0;i<history.length;i+=2){
   output+=(Math.floor(i/2)+1)+". "+history[i]+" ";
-  if(history[i+1]) output+=history[i+1];
+
+  if(history[i+1]){
+   output+=history[i+1];
+  }
+
   output+="  ";
  }
+
  historyEl.textContent=output;
 }
 
 function updateGameStatus(){
  if(game.in_checkmate()){
   statusEl.textContent="Skakmat! Permainan selesai.";
+
  }else if(game.in_draw()){
   statusEl.textContent="Permainan remis.";
+
  }else if(game.in_check()){
   statusEl.textContent="Skak! Raja sedang dalam ancaman.";
   playSound("check");
+
  }else{
   statusEl.textContent=game.turn()==="w"?"Giliran Putih.":"Giliran Hitam.";
  }
@@ -394,8 +490,13 @@ function clearSelection(){
  legalMoves=[];
 }
 
+// =====================================
+// TOMBOL PERMAINAN
+// =====================================
+
 document.getElementById("undo").addEventListener("click",()=>{
- if(engineBusy) return;
+ if(engineBusy)return;
+
  game.undo();
  clearSelection();
  renderBoard();
@@ -403,12 +504,16 @@ document.getElementById("undo").addEventListener("click",()=>{
 });
 
 document.getElementById("reset").addEventListener("click",()=>{
- if(engineBusy) stopAnalysis();
+ if(engineBusy)stopAnalysis();
+
  game.reset();
  clearSelection();
+
  recommendationsEl.textContent="Pilih Analisis Posisi untuk mendapatkan rekomendasi.";
  statusEl.textContent="Permainan baru dimulai.";
+
  renderBoard();
+ updateGameStatus();
 });
 
 document.getElementById("flip").addEventListener("click",()=>{
@@ -420,17 +525,36 @@ sideEl.addEventListener("change",()=>{
  orientation=sideEl.value;
  clearSelection();
  renderBoard();
- statusEl.textContent="Kamu memilih bermain sebagai "+(sideEl.value==="w"?"Putih":"Hitam")+".";
+
+ statusEl.textContent=
+  "Kamu memilih bermain sebagai "+
+  (sideEl.value==="w"?"Putih":"Hitam")+".";
 });
+
+// =====================================
+// STOCKFISH ENGINE
+// =====================================
 
 function startEngine(){
  return new Promise((resolve,reject)=>{
-  if(engineReady){resolve();return}
+  if(engineReady){
+   resolve();
+   return;
+  }
+
   if(engineStarting){
    const wait=setInterval(()=>{
-    if(engineReady){clearInterval(wait);resolve()}
-    if(!engineStarting && !engineReady){clearInterval(wait);reject(new Error("Mesin gagal dimulai."))}
+    if(engineReady){
+     clearInterval(wait);
+     resolve();
+    }
+
+    if(!engineStarting && !engineReady){
+     clearInterval(wait);
+     reject(new Error("Mesin gagal dimulai."));
+    }
    },100);
+
    return;
   }
 
@@ -470,8 +594,12 @@ function startEngine(){
 
     if(pvMatch){
      const index=multipvMatch?Number(multipvMatch[1]):1;
+
      analysisLines[index]={
-      score:scoreMatch?{type:scoreMatch[1],value:Number(scoreMatch[2])}:null,
+      score:scoreMatch?{
+       type:scoreMatch[1],
+       value:Number(scoreMatch[2])
+      }:null,
       pv:pvMatch[1].trim().split(/\s+/)
      };
     }
@@ -479,10 +607,12 @@ function startEngine(){
 
    if(line.startsWith("bestmove")){
     clearTimeout(analysisTimer);
+
     engineBusy=false;
     analyzeBtn.disabled=false;
 
     const best=line.split(/\s+/)[1];
+
     if(analysisResolve){
      const done=analysisResolve;
      analysisResolve=null;
@@ -491,12 +621,14 @@ function startEngine(){
    }
   };
 
-  engine.onerror=(e)=>{
+  engine.onerror=()=>{
    clearTimeout(timeout);
+
    engineReady=false;
    engineStarting=false;
    engineBusy=false;
    analyzeBtn.disabled=false;
+
    reject(new Error("Tidak dapat memuat mesin Stockfish."));
   };
 
@@ -514,27 +646,36 @@ function uciToMove(uci){
 
 function scoreText(score){
  if(!score)return "Evaluasi tersedia";
+
  if(score.type==="mate"){
   return score.value>0
    ?"Skakmat dalam "+score.value+" langkah"
    :"Terancam skakmat dalam "+Math.abs(score.value)+" langkah";
  }
+
  const value=score.value/100;
+
  return "Evaluasi "+(value>0?"+":"")+value.toFixed(2);
 }
 
 function describeLine(line,fen){
  const temp=new Chess(fen);
  const moves=[];
+
  for(const uci of line.pv.slice(0,8)){
   const move=uciToMove(uci);
+
   const result=temp.move({
-   from:move.from,to:move.to,
+   from:move.from,
+   to:move.to,
    promotion:move.promotion||"q"
   });
+
   if(!result)break;
+
   moves.push(result.san);
  }
+
  return moves.join(" ");
 }
 
@@ -542,11 +683,19 @@ function stopAnalysis(){
  if(engine && engineBusy){
   engine.postMessage("stop");
  }
- if(analysisTimer)clearTimeout(analysisTimer);
+
+ if(analysisTimer){
+  clearTimeout(analysisTimer);
+ }
+
  engineBusy=false;
  analyzeBtn.disabled=false;
  analysisResolve=null;
 }
+
+// =====================================
+// ANALISIS AI
+// =====================================
 
 async function analyzePosition(){
  unlockAudio();
@@ -557,7 +706,8 @@ async function analyzePosition(){
  }
 
  if(game.turn()!==sideEl.value){
-  statusEl.textContent="Sekarang giliran lawan. Gerakkan bidak lawan secara manual terlebih dahulu.";
+  statusEl.textContent=
+   "Sekarang giliran lawan. Gerakkan bidak lawan secara manual terlebih dahulu.";
   return;
  }
 
@@ -566,6 +716,7 @@ async function analyzePosition(){
  analyzeBtn.disabled=true;
  statusEl.textContent="Mesin sedang menganalisis posisi...";
  recommendationsEl.textContent="Sedang mencari langkah terbaik...";
+
  analysisLines={};
 
  const originalFen=game.fen();
@@ -574,20 +725,24 @@ async function analyzePosition(){
   await startEngine();
 
   engineBusy=true;
+
   engine.postMessage("setoption name MultiPV value 3");
   engine.postMessage("position fen "+originalFen);
 
   const movetime=Number(levelEl.value);
+
   engine.postMessage("go movetime "+movetime);
 
   const bestMove=await new Promise((resolve,reject)=>{
    analysisResolve=resolve;
+
    analysisTimer=setTimeout(()=>{
     if(engineBusy){
      engine.postMessage("stop");
      engineBusy=false;
      analyzeBtn.disabled=false;
      analysisResolve=null;
+
      reject(new Error("Analisis melewati batas waktu."));
     }
    },movetime+12000);
@@ -605,18 +760,24 @@ async function analyzePosition(){
 
   lines.slice(0,3).forEach((line,index)=>{
    recommendationHTML+=
-    '<div class="recommendation"><strong>Rekomendasi '+(index+1)+'</strong><br>'+
+    '<div class="recommendation"><strong>Rekomendasi '+
+    (index+1)+'</strong><br>'+
     scoreText(line.score)+'<br>'+
-    '<span class="small">'+describeLine(line,originalFen)+'</span></div>';
+    '<span class="small">'+
+    describeLine(line,originalFen)+
+    '</span></div>';
   });
 
   if(!recommendationHTML){
-   recommendationHTML='<div class="recommendation">Langkah terbaik ditemukan: '+bestMove+'</div>';
+   recommendationHTML=
+    '<div class="recommendation">Langkah terbaik ditemukan: '+
+    bestMove+'</div>';
   }
 
   recommendationsEl.innerHTML=recommendationHTML;
 
   const move=uciToMove(bestMove);
+
   const result=game.move({
    from:move.from,
    to:move.to,
@@ -625,17 +786,26 @@ async function analyzePosition(){
 
   if(result){
    playSound(result.captured?"capture":"move");
+
    clearSelection();
    renderBoard();
    updateGameStatus();
-   statusEl.textContent="Rekomendasi pertama sudah dijalankan: "+result.san+". Sekarang giliran lawan.";
+
+   statusEl.textContent=
+    "Rekomendasi pertama sudah dijalankan: "+
+    result.san+". Sekarang giliran lawan.";
+
   }else{
    throw new Error("Langkah dari mesin tidak dapat diterapkan.");
   }
 
  }catch(error){
-  statusEl.textContent=error.message||"Terjadi kesalahan saat analisis.";
-  recommendationsEl.textContent="Analisis gagal. Periksa file Stockfish dan koneksi internet.";
+  statusEl.textContent=
+   error.message||"Terjadi kesalahan saat analisis.";
+
+  recommendationsEl.textContent=
+   "Analisis gagal. Periksa file Stockfish dan koneksi internet.";
+
  }finally{
   engineBusy=false;
   analyzeBtn.disabled=false;
@@ -644,8 +814,13 @@ async function analyzePosition(){
 
 analyzeBtn.addEventListener("click",analyzePosition);
 
+// =====================================
+// MULAI APLIKASI
+// =====================================
+
 renderBoard();
 updateGameStatus();
+
 </script>
 </body>
 </html>
