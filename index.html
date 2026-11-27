@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="id">
 <head>
@@ -414,6 +413,14 @@ document.addEventListener(
  {capture:true}
 );
 
+// Coba aktifkan kembali audio saat halaman dibuka
+window.addEventListener("pageshow",()=>{
+ if(soundEnabled){
+  unlockAudio();
+ }
+});
+
+// Coba aktifkan kembali audio saat kembali ke halaman
 document.addEventListener("visibilitychange",()=>{
  if(!document.hidden && soundEnabled){
   unlockAudio();
