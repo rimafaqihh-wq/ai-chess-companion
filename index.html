@@ -846,13 +846,11 @@ async function analyzePosition(){
 
   lines.slice(0,3).forEach((line,index)=>{
    const arrow=moveArrow(line,originalFen);
-   const move=uciToMove(line.pv[0]);
 
    recommendationHTML+=
     '<div class="recommendation"><strong>Rekomendasi '+
     (index+1)+'</strong><br>'+
-    '<strong>'+arrow+': '+
-    move.from+' → '+move.to+'</strong><br>'+
+    '<strong>Bidak: '+arrow+'</strong><br>'+
     scoreText(line.score)+'<br>'+
     '<span class="small">'+
     describeLine(line,originalFen)+
@@ -865,8 +863,7 @@ async function analyzePosition(){
 
    recommendationHTML=
     '<div class="recommendation"><strong>Rekomendasi 1</strong><br>'+
-    '<strong>'+fallbackName+': '+
-    fallbackMove.from+' → '+fallbackMove.to+
+    '<strong>Bidak: '+fallbackName+
     '</strong><br>Langkah terbaik ditemukan.</div>';
   }
 
@@ -879,4 +876,68 @@ async function analyzePosition(){
     recommendationHTML;
   }else if(mateMode){
    recommendationsEl.innerHTML=
-    '<div class="recommendation"><strong>Pencarian Che
+    '<div class="recommendation"><strong>Pencarian Checkmate selesai.</strong><br>'+
+    'Belum ditemukan jalur Checkmate paksa dalam pencarian ini.</div>'+
+    recommendationHTML;
+  }else{
+   recommendationsEl.innerHTML=recommendationHTML;
+  }
+
+  // Jalankan langkah pertama dari jalur yang dipilih
+  const chosenUci=
+   selectedLine && selectedLine.pv.length
+    ?selectedLine.pv[0]
+    :bestMove;
+
+  const move=uciToMove(chosenUci);
+
+  const result=game.move({
+   from:move.from,
+   to:move.to,
+   promotion:move.promotion||"q"
+  });
+
+  if(result){
+   playSound(result.captured?"capture":"move");
+
+   clearSelection();
+   renderBoard();
+   updateGameStatus();
+
+   if(game.in_checkmate()){
+    updateGameStatus();
+   }else{
+    statusEl.textContent=
+     "Rekomendasi pertama sudah dijalankan: "+
+     result.san+". Sekarang giliran lawan.";
+   }
+
+  }else{
+   throw new Error("Langkah dari mesin tidak dapat diterapkan.");
+  }
+
+ }catch(error){
+  statusEl.textContent=
+   error.message||"Terjadi kesalahan saat analisis.";
+
+  recommendationsEl.textContent=
+   "Analisis gagal. Periksa file Stockfish dan koneksi internet.";
+
+ }finally{
+  engineBusy=false;
+  analyzeBtn.disabled=false;
+ }
+}
+
+analyzeBtn.addEventListener("click",analyzePosition);
+
+// =====================================
+// MULAI APLIKASI
+// =====================================
+
+renderBoard();
+updateGameStatus();
+
+</script>
+</body>
+</html>
