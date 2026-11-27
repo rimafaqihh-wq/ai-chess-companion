@@ -118,6 +118,44 @@ select{max-width:125px}
 .small{font-size:11px;color:#a99aa1}
 button:active{transform:scale(.98)}
 button:disabled{opacity:.5}
+
+/* NOTIFIKASI HASIL PERMAINAN */
+.result-overlay{
+ position:fixed;
+ inset:0;
+ z-index:1000;
+ display:none;
+ align-items:center;
+ justify-content:center;
+ padding:15px;
+ background:rgba(0,0,0,.35);
+}
+.result-box{
+ min-width:190px;
+ max-width:85%;
+ padding:15px 22px;
+ text-align:center;
+ background:#30262e;
+ border:1px solid #a77a59;
+ border-radius:12px;
+ box-shadow:0 5px 25px rgba(0,0,0,.45);
+}
+.result-box h2{
+ margin:0;
+ font-size:19px;
+ letter-spacing:1px;
+ color:#f2d19e;
+}
+.result-box p{
+ margin:7px 0 12px;
+ font-size:12px;
+ color:#f7f1e9;
+}
+.result-box button{
+ padding:7px 18px;
+ font-size:11px;
+}
+
 @media(min-width:500px){
  body{padding:20px}
 }
@@ -173,6 +211,15 @@ button:disabled{opacity:.5}
 
 </div>
 
+<!-- NOTIFIKASI HASIL -->
+<div id="resultOverlay" class="result-overlay">
+ <div class="result-box">
+  <h2 id="resultTitle">CHECKMATE</h2>
+  <p id="resultReason">WHITE WINS</p>
+  <button id="closeResult">Tutup</button>
+ </div>
+</div>
+
 <script>
 const game = new Chess();
 
@@ -184,6 +231,29 @@ const analyzeBtn = document.getElementById("analyze");
 const statusEl = document.getElementById("status");
 const recommendationsEl = document.getElementById("recommendations");
 const historyEl = document.getElementById("history");
+
+const resultOverlay = document.getElementById("resultOverlay");
+const resultTitle = document.getElementById("resultTitle");
+const resultReason = document.getElementById("resultReason");
+
+let resultShown = false;
+
+function showGameResult(title,reason){
+ if(resultShown)return;
+
+ resultTitle.textContent=title;
+ resultReason.textContent=reason;
+ resultOverlay.style.display="flex";
+ resultShown=true;
+}
+
+function hideGameResult(){
+ resultOverlay.style.display="none";
+}
+
+document.getElementById("closeResult").addEventListener("click",()=>{
+ hideGameResult();
+});
 
 let orientation = "w";
 let selectedSquare = null;
@@ -499,32 +569,49 @@ function updateGameStatus(){
    "PERMAINAN BERAKHIR: CHECKMATE! Raja "+(game.turn()==="w"?"Putih":"Hitam")+
    " terkena skakmat. Pemenangnya adalah "+winner+".";
 
+  showGameResult("CHECKMATE",winner.toUpperCase()+" WINS");
+
  }else if(game.in_stalemate()){
   statusEl.textContent=
    "PERMAINAN BERAKHIR: REMIS karena Stalemate. Pemain yang mendapat giliran tidak memiliki langkah legal, tetapi rajanya tidak sedang diskak.";
+
+  showGameResult("STALEMATE","DRAW");
 
  }else if(game.insufficient_material()){
   statusEl.textContent=
    "PERMAINAN BERAKHIR: REMIS karena materi bidak tidak cukup untuk melakukan checkmate.";
 
+  showGameResult("INSUFFICIENT MATERIAL","DRAW");
+
  }else if(game.in_threefold_repetition()){
   statusEl.textContent=
    "PERMAINAN BERAKHIR: REMIS karena posisi yang sama telah terulang tiga kali.";
+
+  showGameResult("THREEFOLD REPETITION","DRAW");
 
  }else if(Number(game.fen().split(" ")[4])>=100){
   statusEl.textContent=
    "PERMAINAN BERAKHIR: REMIS karena aturan 50 langkah tanpa pemindahan pion atau pemakanan bidak.";
 
+  showGameResult("50-MOVE RULE","DRAW");
+
  }else if(game.in_draw()){
   statusEl.textContent=
    "PERMAINAN BERAKHIR: REMIS berdasarkan aturan permainan catur.";
 
- }else if(game.in_check()){
-  statusEl.textContent="Skak! Raja sedang dalam ancaman.";
-  playSound("check");
+  showGameResult("DRAW","GAME DRAWN");
 
  }else{
-  statusEl.textContent=game.turn()==="w"?"Giliran Putih.":"Giliran Hitam.";
+  resultShown=false;
+  hideGameResult();
+
+  if(game.in_check()){
+   statusEl.textContent="Skak! Raja sedang dalam ancaman.";
+   playSound("check");
+
+  }else{
+   statusEl.textContent=game.turn()==="w"?"Giliran Putih.":"Giliran Hitam.";
+  }
  }
 }
 
@@ -551,6 +638,9 @@ document.getElementById("reset").addEventListener("click",()=>{
 
  game.reset();
  clearSelection();
+
+ resultShown=false;
+ hideGameResult();
 
  recommendationsEl.textContent="Pilih Analisis Posisi untuk mendapatkan rekomendasi.";
  statusEl.textContent="Permainan baru dimulai.";
@@ -798,7 +888,7 @@ async function analyzePosition(){
   engineBusy=true;
 
   const mateMode=levelEl.value==="mate";
-  const movetime=mateMode?3000:Number(levelEl.value);
+  const movetime=mateMode?500:Number(levelEl.value);
   const multiPV=mateMode?5:3;
 
   engine.postMessage("setoption name MultiPV value "+multiPV);
