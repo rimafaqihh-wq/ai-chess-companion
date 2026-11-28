@@ -453,19 +453,25 @@ soundBtn.addEventListener("click",()=>{
 // PAPAN CATUR
 // =====================================
 
-// Seret bidak dengan jari atau mouse (drag-and-drop)
+// Drag-and-drop dengan Pointer Events; pointerup dipantau di document
 let dragState=null;
 let suppressSquareClick=false;
 
-boardEl.addEventListener("pointerdown",event=>{
- const square=event.target.closest(".square");
- if(!square || game.game_over())return;
+function suppressNextClick(){
+ suppressSquareClick=true;
+ setTimeout(()=>{suppressSquareClick=false;},0);
+}
+
+document.addEventListener("pointerdown",event=>{
+ if(dragState || game.game_over())return;
+ const square=event.target.closest && event.target.closest("#board .square");
+ if(!square)return;
  const from=square.dataset.square;
  const piece=game.get(from);
  if(!piece || piece.color!==game.turn())return;
  if(event.pointerType==="mouse" && event.button!==0)return;
+
  unlockAudio();
- const rect=square.getBoundingClientRect();
  const floating=document.createElement("span");
  floating.className="piece "+(piece.color==="w"?"white":"black")+" drag-piece";
  floating.textContent=symbols[piece.color==="w"?piece.type.toUpperCase():piece.type];
@@ -473,44 +479,58 @@ boardEl.addEventListener("pointerdown",event=>{
  floating.style.top=event.clientY+"px";
  document.body.appendChild(floating);
  square.classList.add("drag-origin");
- dragState={from,pointerId:event.pointerId,origin:square,floating,moved:false,startX:event.clientX,startY:event.clientY};
- try{boardEl.setPointerCapture(event.pointerId);}catch(e){}
- event.preventDefault();
+ dragState={
+  from,
+  pointerId:event.pointerId,
+  origin:square,
+  floating,
+  moved:false,
+  startX:event.clientX,
+  startY:event.clientY
+ };
 });
 
-boardEl.addEventListener("pointermove",event=>{
+document.addEventListener("pointermove",event=>{
  if(!dragState || event.pointerId!==dragState.pointerId)return;
- const dx=event.clientX,dy=event.clientY;
- if(Math.abs(dx-dragState.startX)>4 || Math.abs(dy-dragState.startY)>4)dragState.moved=true;
- dragState.floating.style.left=dx+"px";
- dragState.floating.style.top=dy+"px";
- event.preventDefault();
+ if(Math.abs(event.clientX-dragState.startX)>4 ||
+    Math.abs(event.clientY-dragState.startY)>4){
+  dragState.moved=true;
+ }
+ dragState.floating.style.left=event.clientX+"px";
+ dragState.floating.style.top=event.clientY+"px";
 });
 
-boardEl.addEventListener("pointerup",event=>{
+document.addEventListener("pointerup",event=>{
  if(!dragState || event.pointerId!==dragState.pointerId)return;
  const drag=dragState;
  dragState=null;
  drag.floating.remove();
  drag.origin.classList.remove("drag-origin");
- const target=document.elementFromPoint(event.clientX,event.clientY)?.closest(".square");
- const to=target?.dataset.square;
- if(to && to!==drag.from){
+
+ const target=document.elementFromPoint(event.clientX,event.clientY);
+ const square=target && target.closest ? target.closest("#board .square") : null;
+ const to=square ? square.dataset.square : null;
+
+ if(drag.moved && to && to!==drag.from){
   const result=game.move({from:drag.from,to,promotion:"q"});
+  suppressNextClick();
   if(result){
-   suppressSquareClick=true;
    playSound(result.captured?"capture":"move");
-   selectedSquare=null;legalMoves=[];
-   renderBoard();updateGameStatus();
+   selectedSquare=null;
+   legalMoves=[];
+   renderBoard();
+   updateGameStatus();
    return;
   }
  }
- if(drag.moved)suppressSquareClick=true;
- renderBoard();
+ if(drag.moved){
+  suppressNextClick();
+  renderBoard();
+ }
 });
 
-boardEl.addEventListener("pointercancel",()=>{
- if(!dragState)return;
+document.addEventListener("pointercancel",event=>{
+ if(!dragState || event.pointerId!==dragState.pointerId)return;
  dragState.floating.remove();
  dragState.origin.classList.remove("drag-origin");
  dragState=null;
@@ -581,6 +601,10 @@ function renderBoard(){
 // =====================================
 
 function handleSquareClick(square){
+ if(suppressSquareClick){
+  suppressSquareClick=false;
+  return;
+ }
  unlockAudio();
 
  if(game.game_over())return;
@@ -972,8 +996,9 @@ async function analyzePosition(){
 
   const mateMode=levelEl.value==="mate";
 
-  // SEMUA MODE ANALISIS: 0,1 DETIK
-  const movetime=100;
+  // Durasi mengikuti pilihan tingkat analisis.
+  // Mode Checkmate diberi waktu lebih panjang agar jalur mate sempat ditemukan.
+  const movetime=mateMode?10000:Number(levelEl.value);
 
   const multiPV=mateMode?5:3;
 
@@ -1048,17 +1073,24 @@ async function analyzePosition(){
     '</strong><br>Langkah terbaik ditemukan.</div>';
   }
 
-  if(mateLines.length){
+  if(mateMode && mateLines.length){
+   recommendationsEl.innerHTML=
+    '<div class="recommendation"><strong>Jalur Checkmate Cepat</strong><br>'+
+    'Jalur checkmate tercepat ditemukan: '+scoreText(selectedLine.score)+
+    '<br><span class="small">Langkah awal: '+moveArrow(selectedLine,originalFen)+
+    ' — '+selectedLine.pv[0]+'</span></div>'+
+    recommendationHTML;
+  }else if(mateMode){
+   recommendationsEl.innerHTML=
+    '<div class="recommendation"><strong>Jalur Checkmate Cepat</strong><br>'+
+    'Belum ditemukan jalur checkmate paksa dari posisi ini. Coba analisis lagi setelah posisi berubah.</div>'+
+    recommendationHTML;
+  }else if(mateLines.length){
    recommendationsEl.innerHTML=
     '<div class="recommendation"><strong>Jalur CHECKMATE tercepat ditemukan!</strong><br>'+
     scoreText(selectedLine.score)+
     '<br><span class="small">Bidak yang dijalankan: '+
     moveArrow(selectedLine,originalFen)+'</span></div>'+
-    recommendationHTML;
-  }else if(mateMode){
-   recommendationsEl.innerHTML=
-    '<div class="recommendation"><strong>Pencarian Checkmate selesai.</strong><br>'+
-    'Belum ditemukan jalur Checkmate paksa dalam pencarian ini.</div>'+
     recommendationHTML;
   }else{
    recommendationsEl.innerHTML=recommendationHTML;
