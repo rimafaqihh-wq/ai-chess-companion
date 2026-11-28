@@ -616,6 +616,7 @@ document.addEventListener("pointerup",event=>{
    selectedSquare=null;
    legalMoves=[];
    renderBoard();
+   animatePieceToSquare(drag.from,to,result);
    updateGameStatus();
    scheduleComputerTurn();
    return;
@@ -634,6 +635,55 @@ document.addEventListener("pointercancel",event=>{
  dragState=null;
  renderBoard();
 });
+
+function animatePieceToSquare(from,to,moveResult){
+ const fromSquare=boardEl.querySelector('[data-square="'+from+'"]');
+ const toSquare=boardEl.querySelector('[data-square="'+to+'"]');
+ if(!fromSquare || !toSquare || !moveResult)return;
+
+ const fromRect=fromSquare.getBoundingClientRect();
+ const toRect=toSquare.getBoundingClientRect();
+ const destinationPiece=toSquare.querySelector(".piece");
+ if(!destinationPiece)return;
+
+ const movingPiece=document.createElement("span");
+ const color=moveResult.color==="w"?"white":"black";
+ const pieceType=moveResult.promotion||moveResult.piece;
+ const symbolKey=moveResult.color==="w"?pieceType.toUpperCase():pieceType;
+ movingPiece.className="piece "+color;
+ movingPiece.textContent=symbols[symbolKey]||symbols[moveResult.color==="w"?"Q":"q"];
+ movingPiece.style.position="fixed";
+ movingPiece.style.left=(fromRect.left+fromRect.width/2)+"px";
+ movingPiece.style.top=(fromRect.top+fromRect.height/2)+"px";
+ movingPiece.style.width=fromRect.width+"px";
+ movingPiece.style.height=fromRect.height+"px";
+ movingPiece.style.display="flex";
+ movingPiece.style.alignItems="center";
+ movingPiece.style.justifyContent="center";
+ movingPiece.style.pointerEvents="none";
+ movingPiece.style.zIndex="10001";
+ movingPiece.style.margin="0";
+ movingPiece.style.transform="translate(-50%,-50%)";
+ document.body.appendChild(movingPiece);
+
+ destinationPiece.style.visibility="hidden";
+ const dx=(toRect.left+toRect.width/2)-(fromRect.left+fromRect.width/2);
+ const dy=(toRect.top+toRect.height/2)-(fromRect.top+fromRect.height/2);
+ const finish=()=>{
+  movingPiece.remove();
+  destinationPiece.style.visibility="";
+ };
+ if(typeof movingPiece.animate==="function"){
+  const animation=movingPiece.animate([
+   {transform:"translate(-50%,-50%)"},
+   {transform:"translate(calc(-50% + "+dx+"px),calc(-50% + "+dy+"px))"}
+  ],{duration:300,easing:"cubic-bezier(.2,.75,.25,1)",fill:"forwards"});
+  animation.onfinish=finish;
+  animation.oncancel=finish;
+ }else{
+  finish();
+ }
+}
 
 function isComputerMode(){ return modeEl.value==="computer"; }
 function isHumanTurn(){ return !isComputerMode() || game.turn()===sideEl.value; }
@@ -732,6 +782,7 @@ function handleSquareClick(square){
     selectedSquare=null;
     legalMoves=[];
     renderBoard();
+    animatePieceToSquare(selectedSquare,square,result);
     updateGameStatus();
     scheduleComputerTurn();
     return;
@@ -1124,6 +1175,7 @@ async function playComputerTurn(){
    playSound(result.captured?"capture":"move");
    clearSelection();
    renderBoard();
+   animatePieceToSquare(move.from,move.to,result);
    updateGameStatus();
    if(!game.game_over())statusEl.textContent="Komputer melangkah: "+result.san+". Giliranmu.";
   }
@@ -1288,6 +1340,7 @@ async function analyzePosition(){
 
    clearSelection();
    renderBoard();
+   animatePieceToSquare(move.from,move.to,result);
    updateGameStatus();
 
    if(game.in_checkmate()){
