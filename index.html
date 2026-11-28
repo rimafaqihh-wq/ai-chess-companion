@@ -198,9 +198,9 @@ button:disabled{opacity:.5}
 
  <div class="analysis-controls">
   <select id="level">
-   <option value="1000">Cepat</option>
-   <option value="3000" selected>Seimbang</option>
-   <option value="7000">Lebih Teliti</option>
+   <option value="100">Cepat</option>
+   <option value="100" selected>Seimbang</option>
+   <option value="100">Lebih Teliti</option>
    <option value="mate">Checkmate Cepat</option>
   </select>
   <button id="analyze">Analisis Posisi</button>
@@ -998,7 +998,7 @@ async function analyzePosition(){
 
   // Durasi mengikuti pilihan tingkat analisis.
   // Mode Checkmate diberi waktu lebih panjang agar jalur mate sempat ditemukan.
-  const movetime=mateMode?10000:Number(levelEl.value);
+  const movetime=100;
 
   const multiPV=mateMode?5:3;
 
