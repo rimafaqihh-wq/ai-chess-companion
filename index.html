@@ -157,7 +157,10 @@ button:disabled{opacity:.5}
 
 
 /* KAMERA LANGSUNG */
-.camera-panel{margin:0 0 14px;padding:12px;background:#241e25;border:1px solid #493943;border-radius:12px}
+.camera-mode-panel{display:flex;align-items:center;justify-content:space-between;gap:10px;margin:0 0 12px;padding:10px 12px;background:#241e25;border:1px solid #493943;border-radius:10px;font-size:12px;color:#e6d9df}
+.camera-mode-panel select{max-width:170px}
+.camera-panel{display:none;margin:0 0 14px;padding:12px;background:#241e25;border:1px solid #493943;border-radius:12px}
+.app.camera-enabled .camera-panel{display:block}
 .camera-panel h2{font-size:15px;margin:0 0 8px}
 .camera-video-wrap{position:relative;width:100%;aspect-ratio:4/3;background:#100d12;border-radius:9px;overflow:hidden;display:none}
 .camera-video-wrap.active{display:block}
@@ -204,7 +207,15 @@ button:disabled{opacity:.5}
  </div>
 
 
- <div class="camera-panel">
+ <div class="camera-mode-panel">
+  <label for="cameraMode">Fitur kamera</label>
+  <select id="cameraMode">
+   <option value="off" selected>Tanpa Kamera</option>
+   <option value="on">Gunakan Kamera</option>
+  </select>
+ </div>
+
+ <div class="camera-panel" id="cameraPanel">
   <h2>AI Chess Vision</h2>
   <div id="cameraPlaceholder" class="camera-placeholder">
    Kamera langsung untuk melihat papan catur fisik atau layar perangkat lain.
@@ -1178,6 +1189,23 @@ function stopLiveCamera(){
  cameraStopBtn.disabled=true;
  cameraStatus.textContent="Kamera dimatikan.";
 }
+
+const cameraModeEl=document.getElementById("cameraMode");
+const cameraPanelEl=document.getElementById("cameraPanel");
+
+cameraModeEl.addEventListener("change",()=>{
+ const enabled=cameraModeEl.value==="on";
+ document.querySelector(".app").classList.toggle("camera-enabled",enabled);
+ if(!enabled){
+  stopLiveCamera();
+  cameraStatus.textContent="Mode tanpa kamera dipilih. Fitur kamera disembunyikan.";
+ }else{
+  cameraStatus.textContent="Mode kamera dipilih. Tekan Mulai Kamera jika ingin menggunakan kamera.";
+ }
+});
+
+// Mode awal: tanpa kamera. Panel kamera baru muncul jika dipilih.
+document.querySelector(".app").classList.remove("camera-enabled");
 
 cameraStartBtn.addEventListener("click",startLiveCamera);
 cameraStopBtn.addEventListener("click",stopLiveCamera);
