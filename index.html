@@ -225,7 +225,11 @@ button:disabled{opacity:.5}
  <div class="header">
   <h1>AI CHESS COMPANION</h1>
   <div class="header-right">
-   <select id="side">
+   <select id="mode" aria-label="Mode permainan">
+    <option value="computer">Player vs Computer</option>
+    <option value="two">2 Players</option>
+   </select>
+   <select id="side" aria-label="Warna bidak pemain">
     <option value="w">Putih</option>
     <option value="b">Hitam</option>
    </select>
@@ -241,6 +245,21 @@ button:disabled{opacity:.5}
   <button id="undo">Undo</button>
   <button id="reset">Restart</button>
   <button id="flip">Balik Papan</button>
+ </div>
+
+ <div class="analysis-controls" id="computerControls" style="margin-top:12px">
+  <select id="computerLevel" aria-label="Level komputer">
+   <option value="1">Level 1 · Pemula</option>
+   <option value="2">Level 2 · Mudah</option>
+   <option value="3">Level 3 · Santai</option>
+   <option value="4">Level 4 · Menengah</option>
+   <option value="5">Level 5 · Cukup Kuat</option>
+   <option value="6">Level 6 · Kuat</option>
+   <option value="7">Level 7 · Sangat Kuat</option>
+   <option value="8">Level 8 · Ahli</option>
+   <option value="9">Level 9 · Master</option>
+   <option value="10">Level 10 · Champion</option>
+  </select>
  </div>
 
  <div class="analysis-controls">
@@ -282,6 +301,9 @@ const game = new Chess();
 
 const boardEl = document.getElementById("board");
 const sideEl = document.getElementById("side");
+const modeEl = document.getElementById("mode");
+const computerLevelEl = document.getElementById("computerLevel");
+const computerControlsEl = document.getElementById("computerControls");
 const soundBtn = document.getElementById("sound");
 const levelEl = document.getElementById("level");
 const analyzeBtn = document.getElementById("analyze");
@@ -294,6 +316,8 @@ const resultTitle = document.getElementById("resultTitle");
 const resultReason = document.getElementById("resultReason");
 
 let resultShown = false;
+let computerTurnTimer = null;
+let computerMovePending = false;
 
 function showGameResult(title,reason){
  if(resultShown)return;
@@ -510,7 +534,7 @@ function suppressNextClick(){
 }
 
 document.addEventListener("pointerdown",event=>{
- if(dragState || game.game_over())return;
+ if(dragState || game.game_over() || !isHumanTurn())return;
  const square=event.target.closest && event.target.closest("#board .square");
  if(!square)return;
  const from=square.dataset.square;
@@ -567,6 +591,7 @@ document.addEventListener("pointerup",event=>{
    legalMoves=[];
    renderBoard();
    updateGameStatus();
+   scheduleComputerTurn();
    return;
   }
  }
@@ -583,6 +608,14 @@ document.addEventListener("pointercancel",event=>{
  dragState=null;
  renderBoard();
 });
+
+function isComputerMode(){ return modeEl.value==="computer"; }
+function isHumanTurn(){ return !isComputerMode() || game.turn()===sideEl.value; }
+function scheduleComputerTurn(){
+ if(!isComputerMode() || game.game_over() || isHumanTurn())return;
+ if(computerTurnTimer)clearTimeout(computerTurnTimer);
+ computerTurnTimer=setTimeout(()=>{computerTurnTimer=null;playComputerTurn();},250);
+}
 
 function renderBoard(){
  boardEl.innerHTML = "";
@@ -654,7 +687,7 @@ function handleSquareClick(square){
  }
  unlockAudio();
 
- if(game.game_over())return;
+ if(game.game_over() || !isHumanTurn())return;
 
  const piece = game.get(square);
 
@@ -674,6 +707,7 @@ function handleSquareClick(square){
     legalMoves=[];
     renderBoard();
     updateGameStatus();
+    scheduleComputerTurn();
     return;
    }
   }
@@ -789,6 +823,8 @@ document.getElementById("undo").addEventListener("click",()=>{
 });
 
 document.getElementById("reset").addEventListener("click",()=>{
+ if(computerTurnTimer)clearTimeout(computerTurnTimer);
+ computerMovePending=false;
  if(engineBusy)stopAnalysis();
 
  game.reset();
@@ -802,6 +838,7 @@ document.getElementById("reset").addEventListener("click",()=>{
 
  renderBoard();
  updateGameStatus();
+ scheduleComputerTurn();
 });
 
 document.getElementById("flip").addEventListener("click",()=>{
@@ -817,6 +854,24 @@ sideEl.addEventListener("change",()=>{
  statusEl.textContent=
   "Kamu memilih bermain sebagai "+
   (sideEl.value==="w"?"Putih":"Hitam")+".";
+ scheduleComputerTurn();
+});
+
+modeEl.addEventListener("change",()=>{
+ const computerMode=isComputerMode();
+ sideEl.style.display=computerMode?"": "none";
+ computerControlsEl.style.display=computerMode?"": "none";
+ if(computerTurnTimer)clearTimeout(computerTurnTimer);
+ if(engineBusy)stopAnalysis();
+ clearSelection();
+ recommendationsEl.textContent="Pilih Analisis Posisi untuk mendapatkan rekomendasi.";
+ statusEl.textContent=computerMode?"Mode Player vs Computer.":"Mode 2 Players.";
+ renderBoard();
+ updateGameStatus();
+ scheduleComputerTurn();
+});
+computerLevelEl.addEventListener("change",()=>{
+ statusEl.textContent="Level komputer diubah menjadi "+computerLevelEl.value+".";
 });
 
 // =====================================
@@ -1010,6 +1065,51 @@ function stopAnalysis(){
 }
 
 // =====================================
+// GILIRAN OTOMATIS KOMPUTER
+// =====================================
+
+async function playComputerTurn(){
+ if(!isComputerMode() || game.game_over() || isHumanTurn() || engineBusy || computerMovePending)return;
+ computerMovePending=true;
+ statusEl.textContent="Komputer sedang berpikir...";
+ try{
+  await startEngine();
+  if(!isComputerMode() || game.game_over() || isHumanTurn())return;
+  engineBusy=true;
+  analyzeBtn.disabled=true;
+  const level=Number(computerLevelEl.value);
+  const skill=Math.max(0,Math.min(20,(level-1)*2));
+  const movetime=250+level*150;
+  const fen=game.fen();
+  engine.postMessage("setoption name Skill Level value "+skill);
+  engine.postMessage("position fen "+fen);
+  engine.postMessage("go movetime "+movetime);
+  const best=await new Promise((resolve,reject)=>{
+   analysisResolve=resolve;
+   analysisTimer=setTimeout(()=>{
+    if(engineBusy){engine.postMessage("stop");engineBusy=false;analysisResolve=null;reject(new Error("Komputer terlalu lama berpikir."));}
+   },movetime+10000);
+  });
+  if(!best || best==="(none)" || game.fen()!==fen)return;
+  const move=uciToMove(best);
+  const result=game.move({from:move.from,to:move.to,promotion:move.promotion||"q"});
+  if(result){
+   playSound(result.captured?"capture":"move");
+   clearSelection();
+   renderBoard();
+   updateGameStatus();
+   if(!game.game_over())statusEl.textContent="Komputer melangkah: "+result.san+". Giliranmu.";
+  }
+ }catch(error){
+  statusEl.textContent="Komputer tidak dapat bergerak: "+(error.message||"kesalahan mesin.");
+ }finally{
+  engineBusy=false;
+  computerMovePending=false;
+  analyzeBtn.disabled=false;
+ }
+}
+
+// =====================================
 // ANALISIS AI
 // =====================================
 
@@ -1020,9 +1120,8 @@ async function analyzePosition(){
   return;
  }
 
- if(game.turn()!==sideEl.value){
-  statusEl.textContent=
-   "Sekarang giliran lawan. Gerakkan bidak lawan secara manual terlebih dahulu.";
+ if(isComputerMode() && game.turn()!==sideEl.value){
+  statusEl.textContent="Komputer sedang mendapat giliran dan akan bergerak otomatis.";
   return;
  }
 
@@ -1043,6 +1142,10 @@ async function analyzePosition(){
 
   const movetime=Number(levelEl.value);
   const mateMode=levelEl.options[levelEl.selectedIndex].text.includes("Checkmate");
+  if(isComputerMode()){
+   const skill=Math.max(0,Math.min(20,(Number(computerLevelEl.value)-1)*2));
+   engine.postMessage("setoption name Skill Level value "+skill);
+  }
   const multiPV=mateMode?5:3;
 
   engine.postMessage("setoption name MultiPV value "+multiPV);
@@ -1182,6 +1285,7 @@ async function analyzePosition(){
  }finally{
   engineBusy=false;
   analyzeBtn.disabled=false;
+  scheduleComputerTurn();
  }
 }
 
@@ -1194,6 +1298,9 @@ analyzeBtn.addEventListener("click",analyzePosition);
 
 renderBoard();
 updateGameStatus();
+sideEl.style.display="";
+computerControlsEl.style.display="";
+scheduleComputerTurn();
 
 </script>
 <script>
