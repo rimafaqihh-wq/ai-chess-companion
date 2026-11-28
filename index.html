@@ -463,7 +463,7 @@ boardEl.addEventListener("pointerdown",event=>{
  floating.style.top=event.clientY+"px";
  document.body.appendChild(floating);
  square.classList.add("drag-origin");
- dragState={from,pointerId:event.pointerId,origin:square,floating,moved:false};
+ dragState={from,pointerId:event.pointerId,origin:square,floating,moved:false,startX:event.clientX,startY:event.clientY};
  try{boardEl.setPointerCapture(event.pointerId);}catch(e){}
  event.preventDefault();
 });
