@@ -61,6 +61,15 @@ body{
 #modeMenu{max-width:520px;margin:0 auto;min-height:calc(100vh - 24px);display:flex;flex-direction:column;justify-content:center;gap:14px}
 #modeMenu h2{font-size:22px;text-align:center;margin:0 0 5px}
 #modeMenu p{font-size:13px;color:#c9b9c0;text-align:center;margin:0 0 12px}
+#computerSetup{max-width:520px;margin:0 auto;min-height:calc(100vh - 24px);display:none;flex-direction:column;justify-content:center;gap:14px}
+#computerSetup h2{font-size:22px;text-align:center;margin:0 0 5px}
+#computerSetup p{font-size:13px;color:#c9b9c0;text-align:center;margin:0 0 12px}
+.setup-card{padding:18px;background:#241e25;border:1px solid #493943;border-radius:14px}
+.setup-card label{display:block;font-size:12px;color:#c9b9c0;margin-bottom:9px}
+.setup-card select{width:100%;max-width:none;padding:13px}
+.setup-actions{display:flex;gap:9px}
+.setup-actions button{flex:1;padding:12px}
+#startComputer{background:#8e5d3c;border-color:#a77a59;font-weight:bold}
 .mode-choice{width:100%;padding:17px 14px;text-align:left;border:1px solid #66545d;background:#30262e;border-radius:12px}
 .mode-choice strong{display:block;font-size:15px;color:#f2d19e;margin-bottom:5px}
 .mode-choice span{font-size:11px;color:#c9b9c0}
@@ -248,41 +257,14 @@ button:disabled{opacity:.5}
  </button>
  <button class="mode-choice" data-mode="analysis">
   <strong>Analisis</strong>
-  <span>Bebas menggerakkan bidak putih maupun hitam dan mencoba posisi.</span>
+  <span>Atur kedua warna sendiri dan analisis warna yang kamu pilih.</span>
  </button>
 </div>
-<div class="app">
-
- <div class="header">
-  <div class="header-left">
-   <button id="backToMenu" aria-label="Kembali ke pilihan mode" title="Kembali ke pilihan mode">‹</button>
-   <h1>AI CHESS COMPANION</h1>
-  </div>
-  <div class="header-right">
-   <select id="mode" aria-label="Mode permainan" style="display:none">
-    <option value="computer">Player vs Computer</option>
-    <option value="two">2 Players</option>
-    <option value="analysis">Analisis</option>
-   </select>
-   <select id="side" aria-label="Warna bidak pemain">
-    <option value="w">Putih</option>
-    <option value="b">Hitam</option>
-   </select>
-   <button id="sound" aria-label="Suara" title="Hidupkan atau matikan suara">🔊</button>
-  </div>
- </div>
-
- <div class="board-wrap">
-  <div id="board"></div>
- </div>
-
- <div class="controls">
-  <button id="undo">Undo</button>
-  <button id="reset">Restart</button>
-  <button id="flip">Balik Papan</button>
- </div>
-
- <div class="analysis-controls" id="computerControls" style="margin-top:12px">
+<div id="computerSetup" aria-label="Pilih level komputer">
+ <h2>PILIH LEVEL KOMPUTER</h2>
+ <p>Tentukan kekuatan komputer sebelum memulai permainan.</p>
+ <div class="setup-card">
+  <label for="computerLevel">Level komputer</label>
   <select id="computerLevel" aria-label="Level komputer">
    <option value="1">Level 1 · Pemula</option>
    <option value="2">Level 2 · Mudah</option>
@@ -295,6 +277,41 @@ button:disabled{opacity:.5}
    <option value="9">Level 9 · Master</option>
    <option value="10">Level 10 · Champion</option>
   </select>
+ </div>
+ <div class="setup-actions">
+  <button id="backFromComputerSetup">Kembali</button>
+  <button id="startComputer">Mulai Bermain</button>
+ </div>
+</div>
+<div class="app">
+
+ <div class="header">
+  <div class="header-left">
+   <button id="backToMenu" aria-label="Kembali ke pilihan mode" title="Kembali ke pilihan mode">‹</button>
+   <h1>AI CHESS COMPANION</h1>
+  </div>
+  <div class="header-right">
+   <button id="sound" aria-label="Suara" title="Hidupkan atau matikan suara">🔊</button>
+   <select id="mode" aria-label="Mode permainan" style="display:none">
+    <option value="computer">Player vs Computer</option>
+    <option value="two">2 Players</option>
+    <option value="analysis">Analisis</option>
+   </select>
+   <select id="side" aria-label="Pilih warna analisis atau sisi pemain">
+    <option value="w">Putih</option>
+    <option value="b">Hitam</option>
+   </select>
+  </div>
+ </div>
+
+ <div class="board-wrap">
+  <div id="board"></div>
+ </div>
+
+ <div class="controls">
+  <button id="undo">Undo</button>
+  <button id="reset">Restart</button>
+  <button id="flip">Balik Papan</button>
  </div>
 
  <div class="analysis-controls">
@@ -946,13 +963,13 @@ sideEl.addEventListener("change",()=>{
 modeEl.addEventListener("change",()=>{
  const computerMode=isComputerMode();
  const analysisMode=modeEl.value==="analysis";
- sideEl.style.display=computerMode?"": "none";
- computerControlsEl.style.display=computerMode?"": "none";
+ sideEl.style.display=(computerMode||analysisMode)?"":"none";
+ computerControlsEl.style.display="none";
  if(computerTurnTimer)clearTimeout(computerTurnTimer);
  if(engineBusy)stopAnalysis();
  clearSelection();
  recommendationsEl.textContent="Pilih Analisis Posisi untuk mendapatkan rekomendasi.";
- statusEl.textContent=computerMode?"Mode Player vs Computer.":(analysisMode?"Mode Analisis. Kamu bebas menggerakkan bidak putih maupun hitam.":"Mode 2 Players.");
+ statusEl.textContent=computerMode?"Mode Player vs Computer.":(analysisMode?"Mode Analisis. Kamu bisa mengatur kedua warna; analisis hanya untuk warna yang dipilih.":"Mode 2 Players.");
  renderBoard();
  updateGameStatus();
  scheduleComputerTurn();
@@ -1212,6 +1229,10 @@ async function analyzePosition(){
   statusEl.textContent="Komputer sedang mendapat giliran dan akan bergerak otomatis.";
   return;
  }
+ if(modeEl.value==="analysis" && game.turn()!==sideEl.value){
+  statusEl.textContent="Sekarang giliran warna lawan. Kamu bisa mengatur langkahnya, tetapi analisis hanya tersedia untuk warna "+(sideEl.value==="w"?"Putih":"Hitam")+".";
+  return;
+ }
 
  if(engineBusy)return;
 
@@ -1387,18 +1408,36 @@ analyzeBtn.addEventListener("click",analyzePosition);
 
 renderBoard();
 updateGameStatus();
-sideEl.style.display="";
-computerControlsEl.style.display="";
+sideEl.style.display="none";
+computerControlsEl.style.display="none";
+function openGameMode(mode){
+ modeEl.value=mode;
+ document.getElementById("modeMenu").style.display="none";
+ document.getElementById("computerSetup").style.display="none";
+ document.querySelector(".app").classList.add("active");
+ modeEl.dispatchEvent(new Event("change"));
+}
 document.querySelectorAll(".mode-choice").forEach(button=>{
  button.addEventListener("click",()=>{
-  modeEl.value=button.dataset.mode;
-  document.getElementById("modeMenu").style.display="none";
-  document.querySelector(".app").classList.add("active");
-  modeEl.dispatchEvent(new Event("change"));
+  const mode=button.dataset.mode;
+  if(mode==="computer"){
+   document.getElementById("modeMenu").style.display="none";
+   document.getElementById("computerSetup").style.display="flex";
+   return;
+  }
+  openGameMode(mode);
  });
+});
+document.getElementById("backFromComputerSetup").addEventListener("click",()=>{
+ document.getElementById("computerSetup").style.display="none";
+ document.getElementById("modeMenu").style.display="flex";
+});
+document.getElementById("startComputer").addEventListener("click",()=>{
+ openGameMode("computer");
 });
 document.getElementById("backToMenu").addEventListener("click",()=>{
  if(computerTurnTimer){clearTimeout(computerTurnTimer);computerTurnTimer=null;}
+ if(engineBusy)stopAnalysis();
  document.querySelector(".app").classList.remove("active");
  document.getElementById("modeMenu").style.display="flex";
 });
