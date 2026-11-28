@@ -1,9 +1,11 @@
-const CACHE_NAME = "ai-chess-companion-pwa-v1";
+const CACHE_NAME = "ai-chess-companion-pwa-v2";
 const APP_FILES = [
   "./",
   "./index.html",
   "./manifest.webmanifest",
   "./icon.svg",
+  "./queen-white.svg",
+  "./queen-black.svg",
   "./stockfish-19-lite-single.js",
   "./stockfish-19-lite-single.wasm"
 ];
