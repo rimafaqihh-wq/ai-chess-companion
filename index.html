@@ -1179,6 +1179,12 @@ async function loadBoardRecognizer(){
  recognizerLoading=true;
  try{
   const lib=await import("https://esm.sh/@scoriiu/fenshot@0.1.6?bundle");
+  // Simpan fungsi konversi dari library yang sama sebelum proses scan.
+  libResolveOrientation=lib.resolveOrientation;
+  libPlacementToFen=lib.placementToFen;
+  if(typeof libResolveOrientation!=="function" || typeof libPlacementToFen!=="function"){
+   throw new Error("Modul pengenal papan tidak menyediakan fungsi konversi posisi.");
+  }
   boardRecognizer=lib.createRecognizer({
    modelUrl:"https://cdn.jsdelivr.net/npm/@scoriiu/fenshot@0.1.6/model/chess-tiles-v2.onnx",
    wasmPaths:"https://cdn.jsdelivr.net/npm/onnxruntime-web@1.22.0/dist/"
