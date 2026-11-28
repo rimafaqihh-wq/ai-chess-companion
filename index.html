@@ -691,6 +691,7 @@ document.getElementById("undo").addEventListener("click",()=>{
 
 document.getElementById("reset").addEventListener("click",()=>{
  if(engineBusy)stopAnalysis();
+ stopBoardTracking();
 
  game.reset();
  clearSelection();
@@ -1102,6 +1103,11 @@ let cameraBusy = false;
 let boardRecognizer = null;
 let recognizerLoading = false;
 let pendingScanFen = null;
+let boardTrackingActive = false;
+let boardTrackingTimer = null;
+let lastDetectedPlacement = null;
+let stableDetectedCount = 0;
+let boardTrackingBusy = false;
 const scanBoardBtn = document.getElementById("scanBoard");
 const scanResultEl = document.getElementById("scanResult");
 
@@ -1145,7 +1151,18 @@ async function startLiveCamera(){
  }
 }
 
+function stopBoardTracking(){
+ boardTrackingActive=false;
+ if(boardTrackingTimer)clearTimeout(boardTrackingTimer);
+ boardTrackingTimer=null;
+ boardTrackingBusy=false;
+ lastDetectedPlacement=null;
+ stableDetectedCount=0;
+ scanBoardBtn.textContent="Scan Papan";
+}
+
 function stopLiveCamera(){
+ stopBoardTracking();
  if(cameraStream){
   cameraStream.getTracks().forEach(track=>track.stop());
   cameraStream=null;
@@ -1247,10 +1264,11 @@ scanBoardBtn.addEventListener("click",async()=>{
     hideGameResult();
     renderBoard();
     updateGameStatus();
-    recommendationsEl.textContent="Posisi hasil scan sudah dimuat. Tekan Analisis Posisi untuk meninjau posisi latihan ini.";
-    statusEl.textContent="Posisi hasil scan berhasil dimuat untuk latihan atau analisis setelah permainan.";
+    recommendationsEl.textContent="Posisi awal berhasil dimuat. Kamera sekarang memantau perubahan papan. Analisis Stockfish lama tetap tersedia untuk posisi latihan.";
+    statusEl.textContent="Pantauan papan aktif. Jalankan permainan seperti biasa di depan kamera.";
     scanResultEl.style.display="none";
     pendingScanFen=null;
+    startBoardTracking();
    }catch(e){
     game.load(oldFen);
     cameraStatus.textContent=e.message;
@@ -1265,6 +1283,112 @@ scanBoardBtn.addEventListener("click",async()=>{
   scanBoardBtn.disabled=!cameraStream;
  }
 });
+
+// =====================================
+// PANTAUAN PAPAN SETELAH SATU KALI SCAN
+// =====================================
+function currentPlacement(chess){
+ return chess.fen().split(" ")[0];
+}
+
+async function readCameraPlacement(){
+ if(!cameraStream || !cameraVideo.videoWidth)throw new Error("Kamera tidak aktif.");
+ const recognizer=await loadBoardRecognizer();
+ const canvas=document.createElement("canvas");
+ canvas.width=cameraVideo.videoWidth;
+ canvas.height=cameraVideo.videoHeight;
+ const ctx=canvas.getContext("2d");
+ ctx.drawImage(cameraVideo,0,0,canvas.width,canvas.height);
+ const blob=await new Promise((resolve,reject)=>{
+  canvas.toBlob(value=>value?resolve(value):reject(new Error("Gagal membaca frame kamera.")),"image/jpeg",0.92);
+ });
+ const result=await recognizer.recognize(blob);
+ if(!result || !result.reliable) return null;
+ const oriented=libResolveOrientation(result.placement);
+ return libPlacementToFen(oriented.placement,game.turn()).split(" ")[0];
+}
+
+function detectAndApplyCameraMove(detectedPlacement){
+ const matches=[];
+ const legal=game.moves({verbose:true});
+ for(const candidate of legal){
+  const temp=new Chess(game.fen());
+  const applied=temp.move({
+   from:candidate.from,
+   to:candidate.to,
+   promotion:candidate.promotion||"q"
+  });
+  if(applied && currentPlacement(temp)===detectedPlacement){
+   matches.push(candidate);
+  }
+ }
+ if(matches.length!==1)return false;
+ const move=game.move({
+  from:matches[0].from,
+  to:matches[0].to,
+  promotion:matches[0].promotion||"q"
+ });
+ if(!move)return false;
+ playSound(move.captured?"capture":"move");
+ clearSelection();
+ renderBoard();
+ updateGameStatus();
+ cameraStatus.textContent="Langkah terdeteksi dari kamera: "+move.san+". Pantauan berlanjut.";
+ if(game.game_over()){
+  stopBoardTracking();
+  cameraStatus.textContent="Permainan terdeteksi selesai. Riwayat langkah sudah tercatat di aplikasi.";
+ }
+ return true;
+}
+
+function scheduleBoardTracking(){
+ if(!boardTrackingActive || !cameraStream)return;
+ boardTrackingTimer=setTimeout(trackBoardFrame,1800);
+}
+
+async function trackBoardFrame(){
+ if(!boardTrackingActive || !cameraStream || boardTrackingBusy)return;
+ boardTrackingBusy=true;
+ try{
+  const detected=await readCameraPlacement();
+  if(detected){
+   if(detected===currentPlacement(game)){
+    lastDetectedPlacement=detected;
+    stableDetectedCount=0;
+   }else{
+    if(detected===lastDetectedPlacement){
+     stableDetectedCount++;
+    }else{
+     lastDetectedPlacement=detected;
+     stableDetectedCount=1;
+    }
+    // Terima perubahan hanya setelah dua pembacaan yang sama.
+    if(stableDetectedCount>=2){
+     const accepted=detectAndApplyCameraMove(detected);
+     stableDetectedCount=0;
+     lastDetectedPlacement=null;
+     if(!accepted){
+      cameraStatus.textContent="Perubahan papan terlihat, tetapi tidak cocok dengan tepat satu langkah legal. Pastikan papan terlihat utuh dan tunggu posisi stabil.";
+     }
+    }
+   }
+  }
+ }catch(error){
+  cameraStatus.textContent="Pantauan kamera terganggu: "+(error.message||"gagal membaca papan")+". Mencoba lagi.";
+ }finally{
+  boardTrackingBusy=false;
+  scheduleBoardTracking();
+ }
+}
+
+function startBoardTracking(){
+ stopBoardTracking();
+ if(!cameraStream)return;
+ boardTrackingActive=true;
+ scanBoardBtn.textContent="Pantauan Aktif";
+ cameraStatus.textContent="Pantauan aktif setelah satu scan. Kamera memeriksa papan digital secara berkala; gerakan yang tidak terbaca tidak akan dimasukkan.";
+ scheduleBoardTracking();
+}
 
 let libResolveOrientation=null;
 let libPlacementToFen=null;
