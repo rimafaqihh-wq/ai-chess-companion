@@ -68,6 +68,12 @@ body{
  display:flex;align-items:center;justify-content:space-between;
  gap:8px;margin-bottom:15px;
 }
+.header-left{display:flex;align-items:center;gap:7px;min-width:0}
+#backToMenu{
+ width:30px;height:30px;min-width:30px;padding:0;
+ display:grid;place-items:center;font-size:17px;line-height:1;
+ border-radius:8px;
+}
 h1{font-size:19px;letter-spacing:1px;margin:0}
 .header-right{display:flex;align-items:center;gap:6px;flex-wrap:wrap;justify-content:flex-end}
 .header-right #mode{max-width:145px}
@@ -248,7 +254,10 @@ button:disabled{opacity:.5}
 <div class="app">
 
  <div class="header">
-  <h1>AI CHESS COMPANION</h1>
+  <div class="header-left">
+   <button id="backToMenu" aria-label="Kembali ke pilihan mode" title="Kembali ke pilihan mode">‹</button>
+   <h1>AI CHESS COMPANION</h1>
+  </div>
   <div class="header-right">
    <select id="mode" aria-label="Mode permainan" style="display:none">
     <option value="computer">Player vs Computer</option>
@@ -1387,6 +1396,11 @@ document.querySelectorAll(".mode-choice").forEach(button=>{
   document.querySelector(".app").classList.add("active");
   modeEl.dispatchEvent(new Event("change"));
  });
+});
+document.getElementById("backToMenu").addEventListener("click",()=>{
+ if(computerTurnTimer){clearTimeout(computerTurnTimer);computerTurnTimer=null;}
+ document.querySelector(".app").classList.remove("active");
+ document.getElementById("modeMenu").style.display="flex";
 });
 
 </script>
