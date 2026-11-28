@@ -198,10 +198,10 @@ button:disabled{opacity:.5}
 
  <div class="analysis-controls">
   <select id="level">
-   <option value="100">Cepat</option>
-   <option value="100" selected>Seimbang</option>
-   <option value="100">Lebih Teliti</option>
-   <option value="mate">Checkmate Cepat</option>
+   <option value="100">Cepat (0,1 detik)</option>
+   <option value="100" selected>Seimbang (0,1 detik)</option>
+   <option value="100">Lebih Teliti (0,1 detik)</option>
+   <option value="100">Checkmate Cepat (0,1 detik)</option>
   </select>
   <button id="analyze">Analisis Posisi</button>
  </div>
@@ -994,12 +994,8 @@ async function analyzePosition(){
 
   engineBusy=true;
 
-  const mateMode=levelEl.value==="mate";
-
-  // Durasi mengikuti pilihan tingkat analisis.
-  // Mode Checkmate diberi waktu lebih panjang agar jalur mate sempat ditemukan.
-  const movetime=100;
-
+  const movetime=Number(levelEl.value);
+  const mateMode=levelEl.options[levelEl.selectedIndex].text.includes("Checkmate");
   const multiPV=mateMode?5:3;
 
   engine.postMessage("setoption name MultiPV value "+multiPV);
