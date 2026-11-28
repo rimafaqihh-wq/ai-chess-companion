@@ -1,0 +1,21 @@
+{
+  "id": "./",
+  "name": "AI Chess Companion",
+  "short_name": "AI Chess",
+  "description": "Aplikasi pendamping bermain dan analisis catur.",
+  "lang": "id",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#17131a",
+  "theme_color": "#17131a",
+  "icons": [
+    {
+      "src": "./icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
