@@ -41,7 +41,17 @@ select{max-width:125px}
 }
 .square{
  position:relative;display:flex;align-items:center;
- justify-content:center;aspect-ratio:1;cursor:pointer;
+ justify-content:center;aspect-ratio:1;cursor:grab;
+ touch-action:none;
+}
+.square.drag-origin .piece{opacity:.18}
+.drag-piece{
+ position:fixed!important;
+ left:0;top:0;
+ transform:translate(-50%,-50%);
+ pointer-events:none!important;
+ z-index:9999;
+ margin:0;
 }
 .light{background:#e8c69b}
 .dark{background:#54232e}
