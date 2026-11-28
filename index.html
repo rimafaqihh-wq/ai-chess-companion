@@ -1235,9 +1235,8 @@ scanBoardBtn.addEventListener("click",async()=>{
   if(!result){
    throw new Error("Papan tidak terdeteksi. Pastikan seluruh papan digital terlihat, lurus, dan tidak terpotong.");
   }
-  if(!result.reliable){
-   throw new Error("Papan terdeteksi, tetapi ada bidak yang kurang jelas. Perbesar tampilan papan dan coba scan lagi. Posisi tidak akan dimasukkan.");
-  }
+  // Hasil dengan confidence rendah tetap ditampilkan untuk pemeriksaan manual.
+  // Jangan langsung menolak seluruh papan; pengguna akan memeriksa posisi di papan aplikasi.
   const oriented=libResolveOrientation(result.placement);
   const placement=oriented.placement;
   const fen=libPlacementToFen(placement,sideEl.value);
@@ -1246,14 +1245,20 @@ scanBoardBtn.addEventListener("click",async()=>{
    throw new Error("Hasil scan bukan posisi catur yang valid. Coba lagi.");
   }
   pendingScanFen=fen;
+  const confidence=Math.round((result.meanConfidence||0)*100);
+  const minConfidence=Math.round((result.minConfidence||0)*100);
   scanResultEl.innerHTML=
-   "<strong>Posisi berhasil dibaca — periksa dahulu.</strong><br>"+
-   "Keyakinan rata-rata: "+Math.round(result.meanConfidence*100)+"%.<br>"+
+   (result.reliable
+    ?"<strong>Posisi terbaca. Periksa dahulu sebelum digunakan.</strong><br>"
+    :"<strong>Perhatian: beberapa bidak kurang dikenali.</strong><br>"+
+     "Hasil tetap ditampilkan agar kamu bisa memeriksanya secara manual. Jangan gunakan jika susunan bidak tidak sama.<br>")+
+   "Keyakinan rata-rata: "+confidence+"%.<br>"+
+   "Kotak dengan keyakinan terendah: "+minConfidence+"%.<br>"+
    "Giliran berikutnya mengikuti pilihan Putih/Hitam di bagian atas.<br>"+
    "<span class='fen'>"+fen+"</span><br>"+
-   "<span class='small'>Hak rokade dan riwayat langkah tidak dapat diketahui dari gambar, jadi mungkin perlu disesuaikan.</span>";
+   "<span class='small'>Setelah posisi dimuat, cocokkan semua bidak pada papan aplikasi dengan layar sumber. Hak rokade dan riwayat langkah tidak dapat diketahui dari gambar.</span>";
   const useBtn=document.createElement("button");
-  useBtn.textContent="Gunakan posisi hasil scan";
+  useBtn.textContent=result.reliable?"Periksa & gunakan posisi":"Muat untuk pemeriksaan manual";
   useBtn.addEventListener("click",()=>{
    if(!pendingScanFen)return;
    const oldFen=game.fen();
@@ -1265,7 +1270,7 @@ scanBoardBtn.addEventListener("click",async()=>{
     renderBoard();
     updateGameStatus();
     recommendationsEl.textContent="Posisi awal berhasil dimuat. Kamera sekarang memantau perubahan papan. Analisis Stockfish lama tetap tersedia untuk posisi latihan.";
-    statusEl.textContent="Pantauan papan aktif. Jalankan permainan seperti biasa di depan kamera.";
+    statusEl.textContent="Posisi dimuat. Cocokkan semua bidak dengan layar sumber sebelum melanjutkan pantauan kamera.";
     scanResultEl.style.display="none";
     pendingScanFen=null;
     startBoardTracking();
