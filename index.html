@@ -179,7 +179,7 @@ button:disabled{opacity:.5}
 .scan-result .fen{font-size:10px;word-break:break-all;color:#d7c6ce}
 
 /* Saat kamera aktif, kamera menggantikan area papan catur */
-.app.camera-active .board-wrap{display:none}
+.app.camera-active .board-wrap{display:block;margin-top:12px}
 .app.camera-active .camera-panel{margin-bottom:14px}
 .app.camera-active .camera-panel h2,
 .app.camera-active .camera-placeholder{display:none}
@@ -1341,6 +1341,26 @@ async function readCameraPlacement(){
  return libPlacementToFen(oriented.placement,game.turn()).split(" ")[0];
 }
 
+function animateDetectedMove(from,to,piece){
+ const fromEl=boardEl.querySelector('[data-square="'+from+'"]');
+ const toEl=boardEl.querySelector('[data-square="'+to+'"]');
+ if(!fromEl || !toEl || !piece)return;
+ const start=fromEl.getBoundingClientRect();
+ const end=toEl.getBoundingClientRect();
+ const ghost=document.createElement("span");
+ ghost.className="piece "+(piece.color==="w"?"white":"black");
+ ghost.textContent=symbols[piece.color==="w"?piece.type.toUpperCase():piece.type];
+ ghost.style.cssText="position:fixed;z-index:9999;left:"+start.left+"px;top:"+start.top+"px;width:"+start.width+"px;height:"+start.height+"px;display:grid;place-items:center;margin:0;pointer-events:none;font-size:"+Math.min(start.width*.78,49)+"px;";
+ document.body.appendChild(ghost);
+ const dx=end.left-start.left;
+ const dy=end.top-start.top;
+ const animation=ghost.animate([
+  {transform:"translate(0,0) scale(1)",opacity:1},
+  {transform:"translate("+dx+"px,"+dy+"px) scale(1.08)",opacity:1}
+ ],{duration:420,easing:"cubic-bezier(.2,.75,.25,1)"});
+ animation.onfinish=()=>ghost.remove();
+}
+ 
 function detectAndApplyCameraMove(detectedPlacement){
  const matches=[];
  const legal=game.moves({verbose:true});
@@ -1356,6 +1376,7 @@ function detectAndApplyCameraMove(detectedPlacement){
   }
  }
  if(matches.length!==1)return false;
+ const movingPiece=game.get(matches[0].from);
  const move=game.move({
   from:matches[0].from,
   to:matches[0].to,
@@ -1365,6 +1386,7 @@ function detectAndApplyCameraMove(detectedPlacement){
  playSound(move.captured?"capture":"move");
  clearSelection();
  renderBoard();
+ animateDetectedMove(move.from,move.to,movingPiece);
  updateGameStatus();
  cameraStatus.textContent="Langkah terdeteksi dari kamera: "+move.san+". Pantauan berlanjut.";
  if(game.game_over()){
