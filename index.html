@@ -443,6 +443,70 @@ soundBtn.addEventListener("click",()=>{
 // PAPAN CATUR
 // =====================================
 
+// Seret bidak dengan jari atau mouse (drag-and-drop)
+let dragState=null;
+let suppressSquareClick=false;
+
+boardEl.addEventListener("pointerdown",event=>{
+ const square=event.target.closest(".square");
+ if(!square || game.game_over())return;
+ const from=square.dataset.square;
+ const piece=game.get(from);
+ if(!piece || piece.color!==game.turn())return;
+ if(event.pointerType==="mouse" && event.button!==0)return;
+ unlockAudio();
+ const rect=square.getBoundingClientRect();
+ const floating=document.createElement("span");
+ floating.className="piece "+(piece.color==="w"?"white":"black")+" drag-piece";
+ floating.textContent=symbols[piece.color==="w"?piece.type.toUpperCase():piece.type];
+ floating.style.left=event.clientX+"px";
+ floating.style.top=event.clientY+"px";
+ document.body.appendChild(floating);
+ square.classList.add("drag-origin");
+ dragState={from,pointerId:event.pointerId,origin:square,floating,moved:false};
+ try{boardEl.setPointerCapture(event.pointerId);}catch(e){}
+ event.preventDefault();
+});
+
+boardEl.addEventListener("pointermove",event=>{
+ if(!dragState || event.pointerId!==dragState.pointerId)return;
+ const dx=event.clientX,dy=event.clientY;
+ if(Math.abs(dx-dragState.startX)>4 || Math.abs(dy-dragState.startY)>4)dragState.moved=true;
+ dragState.floating.style.left=dx+"px";
+ dragState.floating.style.top=dy+"px";
+ event.preventDefault();
+});
+
+boardEl.addEventListener("pointerup",event=>{
+ if(!dragState || event.pointerId!==dragState.pointerId)return;
+ const drag=dragState;
+ dragState=null;
+ drag.floating.remove();
+ drag.origin.classList.remove("drag-origin");
+ const target=document.elementFromPoint(event.clientX,event.clientY)?.closest(".square");
+ const to=target?.dataset.square;
+ if(to && to!==drag.from){
+  const result=game.move({from:drag.from,to,promotion:"q"});
+  if(result){
+   suppressSquareClick=true;
+   playSound(result.captured?"capture":"move");
+   selectedSquare=null;legalMoves=[];
+   renderBoard();updateGameStatus();
+   return;
+  }
+ }
+ if(drag.moved)suppressSquareClick=true;
+ renderBoard();
+});
+
+boardEl.addEventListener("pointercancel",()=>{
+ if(!dragState)return;
+ dragState.floating.remove();
+ dragState.origin.classList.remove("drag-origin");
+ dragState=null;
+ renderBoard();
+});
+
 function renderBoard(){
  boardEl.innerHTML = "";
  const board = game.board();
