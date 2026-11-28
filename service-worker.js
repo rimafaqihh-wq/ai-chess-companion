@@ -1,4 +1,4 @@
-const CACHE_NAME = "ai-chess-companion-pwa-v2";
+const CACHE_NAME = "ai-chess-companion-pwa-v3";
 const APP_FILES = [
   "./",
   "./index.html",
@@ -32,7 +32,6 @@ self.addEventListener("activate", event => {
 self.addEventListener("fetch", event => {
   const request = event.request;
   if (request.method !== "GET") return;
-
   const url = new URL(request.url);
 
   if (url.origin === self.location.origin) {
@@ -48,7 +47,6 @@ self.addEventListener("fetch", event => {
       );
       return;
     }
-
     event.respondWith(
       caches.match(request).then(cached => {
         if (cached) return cached;
@@ -64,8 +62,6 @@ self.addEventListener("fetch", event => {
     return;
   }
 
-  // Simpan pustaka eksternal (misalnya chess.js dari cdnjs)
-  // setelah berhasil dimuat, agar bisa digunakan kembali saat offline.
   event.respondWith(
     caches.match(request).then(cached => {
       if (cached) return cached;
