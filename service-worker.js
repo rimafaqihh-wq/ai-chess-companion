@@ -1,4 +1,4 @@
-const CACHE_NAME = "ai-chess-companion-pwa-v5";
+const CACHE_NAME = "ai-chess-companion-pwa-v6";
 const APP_FILES = [
   "./",
   "./index.html",
