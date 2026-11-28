@@ -90,6 +90,13 @@ select{max-width:125px}
  -webkit-text-stroke:1.2px #211b19;
  text-shadow:0 1px 2px #e3d1b5;
 }
+.piece.queen-white,.piece.queen-black{
+ width:82%;height:90%;font-size:0;line-height:0;
+ background-position:center;background-repeat:no-repeat;background-size:contain;
+ -webkit-text-fill-color:transparent;-webkit-text-stroke:0;text-shadow:none;
+}
+.piece.queen-white{background-image:url("./queen-white.svg")}
+.piece.queen-black{background-image:url("./queen-black.svg")}
 .checked-king:before{
  content:"";position:absolute;width:75%;height:75%;
  border-radius:50%;background:#ed2929;
@@ -479,7 +486,7 @@ document.addEventListener("pointerdown",event=>{
 
  unlockAudio();
  const floating=document.createElement("span");
- floating.className="piece "+(piece.color==="w"?"white":"black")+" drag-piece";
+ floating.className="piece "+(piece.color==="w"?"white":"black")+(piece.type==="q"?(piece.color==="w"?" queen-white":" queen-black"):"")+" drag-piece";
  floating.textContent=symbols[piece.color==="w"?piece.type.toUpperCase():piece.type];
  floating.style.left=event.clientX+"px";
  floating.style.top=event.clientY+"px";
@@ -569,7 +576,7 @@ function renderBoard(){
 
    if(piece){
     const span = document.createElement("span");
-    span.className = "piece "+(piece.color==="w"?"white":"black");
+    span.className = "piece "+(piece.color==="w"?"white":"black")+(piece.type==="q"?(piece.color==="w"?" queen-white":" queen-black"):"");
     span.textContent = symbols[
      piece.color==="w" ? piece.type.toUpperCase() : piece.type
     ];
