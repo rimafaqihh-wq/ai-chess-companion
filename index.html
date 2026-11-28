@@ -56,7 +56,14 @@ body{
  margin:0;background:#17131a;color:#f7f1e9;
  font-family:Arial,sans-serif;padding:12px;
 }
-.app{max-width:520px;margin:auto}
+.app{max-width:520px;margin:auto;display:none}
+.app.active{display:block}
+#modeMenu{max-width:520px;margin:0 auto;min-height:calc(100vh - 24px);display:flex;flex-direction:column;justify-content:center;gap:14px}
+#modeMenu h2{font-size:22px;text-align:center;margin:0 0 5px}
+#modeMenu p{font-size:13px;color:#c9b9c0;text-align:center;margin:0 0 12px}
+.mode-choice{width:100%;padding:17px 14px;text-align:left;border:1px solid #66545d;background:#30262e;border-radius:12px}
+.mode-choice strong{display:block;font-size:15px;color:#f2d19e;margin-bottom:5px}
+.mode-choice span{font-size:11px;color:#c9b9c0}
 .header{
  display:flex;align-items:center;justify-content:space-between;
  gap:8px;margin-bottom:15px;
@@ -222,14 +229,31 @@ button:disabled{opacity:.5}
  <div class="splash-title">AI CHESS COMPANION</div>
  <div class="splash-subtitle">READY TO PLAY</div>
 </div>
+<div id="modeMenu" aria-label="Pilih mode permainan">
+ <h2>PILIH MODE PERMAINAN</h2>
+ <p>Pilih cara bermain yang kamu inginkan.</p>
+ <button class="mode-choice" data-mode="computer">
+  <strong>Player vs Computer</strong>
+  <span>Bermain melawan komputer sesuai level yang dipilih.</span>
+ </button>
+ <button class="mode-choice" data-mode="two">
+  <strong>2 Players</strong>
+  <span>Bermain bergantian bersama pemain lain.</span>
+ </button>
+ <button class="mode-choice" data-mode="analysis">
+  <strong>Analisis</strong>
+  <span>Bebas menggerakkan bidak putih maupun hitam dan mencoba posisi.</span>
+ </button>
+</div>
 <div class="app">
 
  <div class="header">
   <h1>AI CHESS COMPANION</h1>
   <div class="header-right">
-   <select id="mode" aria-label="Mode permainan">
+   <select id="mode" aria-label="Mode permainan" style="display:none">
     <option value="computer">Player vs Computer</option>
     <option value="two">2 Players</option>
+    <option value="analysis">Analisis</option>
    </select>
    <select id="side" aria-label="Warna bidak pemain">
     <option value="w">Putih</option>
@@ -861,13 +885,14 @@ sideEl.addEventListener("change",()=>{
 
 modeEl.addEventListener("change",()=>{
  const computerMode=isComputerMode();
+ const analysisMode=modeEl.value==="analysis";
  sideEl.style.display=computerMode?"": "none";
  computerControlsEl.style.display=computerMode?"": "none";
  if(computerTurnTimer)clearTimeout(computerTurnTimer);
  if(engineBusy)stopAnalysis();
  clearSelection();
  recommendationsEl.textContent="Pilih Analisis Posisi untuk mendapatkan rekomendasi.";
- statusEl.textContent=computerMode?"Mode Player vs Computer.":"Mode 2 Players.";
+ statusEl.textContent=computerMode?"Mode Player vs Computer.":(analysisMode?"Mode Analisis. Kamu bebas menggerakkan bidak putih maupun hitam.":"Mode 2 Players.");
  renderBoard();
  updateGameStatus();
  scheduleComputerTurn();
@@ -1302,7 +1327,14 @@ renderBoard();
 updateGameStatus();
 sideEl.style.display="";
 computerControlsEl.style.display="";
-scheduleComputerTurn();
+document.querySelectorAll(".mode-choice").forEach(button=>{
+ button.addEventListener("click",()=>{
+  modeEl.value=button.dataset.mode;
+  document.getElementById("modeMenu").style.display="none";
+  document.querySelector(".app").classList.add("active");
+  modeEl.dispatchEvent(new Event("change"));
+ });
+});
 
 </script>
 <script>
@@ -1318,8 +1350,8 @@ if ("serviceWorker" in navigator) {
 window.addEventListener("load",()=>{
  const splash=document.getElementById("splashScreen");
  if(!splash)return;
- setTimeout(()=>splash.classList.add("hide"),1050);
- setTimeout(()=>splash.remove(),1500);
+ setTimeout(()=>splash.classList.add("hide"),1550);
+ setTimeout(()=>splash.remove(),2000);
 });
 </script>
 </body>
