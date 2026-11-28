@@ -925,6 +925,14 @@ function stopAnalysis(){
 async function analyzePosition(){
  unlockAudio();
 
+ // Analisis mesin hanya tersedia untuk posisi latihan/manual,
+ // bukan saat kamera sedang memantau pertandingan langsung.
+ if(boardTrackingActive){
+  statusEl.textContent="Analisis Stockfish dijeda selama pantauan kamera pertandingan langsung. Matikan kamera atau hentikan pantauan untuk menganalisis posisi latihan.";
+  recommendationsEl.textContent="Pantauan kamera aktif. Rekomendasi langkah tidak ditampilkan selama pertandingan langsung.";
+  return;
+ }
+
  if(game.game_over()){
   updateGameStatus();
   return;
@@ -1155,6 +1163,7 @@ async function startLiveCamera(){
 
 function stopBoardTracking(){
  boardTrackingActive=false;
+ analyzeBtn.disabled=false;
  if(boardTrackingTimer)clearTimeout(boardTrackingTimer);
  boardTrackingTimer=null;
  boardTrackingBusy=false;
@@ -1409,6 +1418,8 @@ function startBoardTracking(){
  stopBoardTracking();
  if(!cameraStream)return;
  boardTrackingActive=true;
+ analyzeBtn.disabled=true;
+ recommendationsEl.textContent="Pantauan kamera aktif. Posisi dan riwayat langkah akan diperbarui otomatis; analisis Stockfish dijeda selama pertandingan langsung.";
  scanBoardBtn.textContent="Pantauan Aktif";
  cameraStatus.textContent="Pantauan aktif setelah satu scan. Kamera memeriksa papan digital secara berkala; gerakan yang tidak terbaca tidak akan dimasukkan.";
  scheduleBoardTracking();
