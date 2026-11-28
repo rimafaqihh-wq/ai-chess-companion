@@ -15,6 +15,42 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/chess.js/0.10.3/chess.min.js"></script>
 
 <style>
+/* ANIMASI PEMBUKA */
+#splashScreen{
+ position:fixed;inset:0;z-index:10000;
+ display:flex;flex-direction:column;align-items:center;justify-content:center;
+ gap:18px;background:#17131a;
+ opacity:1;visibility:visible;
+ transition:opacity .45s ease,visibility .45s ease;
+}
+#splashScreen.hide{opacity:0;visibility:hidden;pointer-events:none}
+#splashScreen img{
+ width:116px;height:116px;object-fit:contain;
+ filter:drop-shadow(0 0 16px rgba(35,180,255,.55));
+ animation:splashLogo 1.25s ease-in-out infinite alternate;
+}
+#splashScreen .splash-title{
+ color:#f7f1e9;font-size:17px;font-weight:bold;
+ letter-spacing:2.5px;text-align:center;
+ animation:splashText 1s ease both;
+}
+#splashScreen .splash-subtitle{
+ color:#8bcfff;font-size:10px;letter-spacing:3px;
+}
+@keyframes splashLogo{
+ from{transform:translateY(5px) scale(.94);filter:drop-shadow(0 0 8px rgba(35,180,255,.35))}
+ to{transform:translateY(-5px) scale(1.04);filter:drop-shadow(0 0 23px rgba(35,180,255,.8))}
+}
+@keyframes splashText{
+ from{opacity:0;transform:translateY(9px)}
+ to{opacity:1;transform:translateY(0)}
+}
+@media(prefers-reduced-motion:reduce){
+ #splashScreen img,#splashScreen .splash-title{animation:none}
+ #splashScreen{transition:none}
+}
+</style>
+<style>
 *{box-sizing:border-box}
 body{
  margin:0;background:#17131a;color:#f7f1e9;
@@ -179,6 +215,11 @@ button:disabled{opacity:.5}
 </head>
 
 <body>
+<div id="splashScreen" aria-label="AI Chess Companion sedang dibuka">
+ <img src="./icon.svg" alt="Logo AI Chess Companion">
+ <div class="splash-title">AI CHESS COMPANION</div>
+ <div class="splash-subtitle">READY TO PLAY</div>
+</div>
 <div class="app">
 
  <div class="header">
@@ -1163,6 +1204,14 @@ if ("serviceWorker" in navigator) {
     });
   });
 }
+
+// ANIMASI PEMBUKA: tampil singkat setiap aplikasi dibuka
+window.addEventListener("load",()=>{
+ const splash=document.getElementById("splashScreen");
+ if(!splash)return;
+ setTimeout(()=>splash.classList.add("hide"),1900);
+ setTimeout(()=>splash.remove(),2400);
+});
 </script>
 </body>
 </html>
