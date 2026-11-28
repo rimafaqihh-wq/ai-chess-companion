@@ -222,9 +222,7 @@ button:disabled{opacity:.5}
    <video id="liveCamera" autoplay muted playsinline></video>
   </div>
   <div class="camera-buttons">
-   <button id="cameraStart">Mulai Kamera</button>
    <button id="cameraSwitch" disabled>Balik Kamera</button>
-   <button id="cameraStop" disabled>Matikan</button>
   </div>
   <div class="scan-controls"><button id="scanBoard" disabled>Scan Papan</button></div>
   <div id="scanResult" class="scan-result"></div>
@@ -1103,9 +1101,7 @@ const cameraVideo = document.getElementById("liveCamera");
 const cameraWrap = document.getElementById("cameraVideoWrap");
 const cameraPlaceholder = document.getElementById("cameraPlaceholder");
 const cameraStatus = document.getElementById("cameraStatus");
-const cameraStartBtn = document.getElementById("cameraStart");
 const cameraSwitchBtn = document.getElementById("cameraSwitch");
-const cameraStopBtn = document.getElementById("cameraStop");
 let cameraStream = null;
 let cameraFacing = "environment";
 let cameraBusy = false;
@@ -1123,7 +1119,6 @@ const scanResultEl = document.getElementById("scanResult");
 async function startLiveCamera(){
  if(cameraBusy)return;
  cameraBusy=true;
- cameraStartBtn.disabled=true;
  cameraStatus.textContent="Menghubungkan kamera...";
  try{
   if(!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia){
@@ -1156,7 +1151,6 @@ async function startLiveCamera(){
   }
  }finally{
   cameraBusy=false;
-  cameraStartBtn.disabled=false;
  }
 }
 
@@ -1184,7 +1178,6 @@ function stopLiveCamera(){
  document.querySelector(".app").classList.remove("camera-active");
  cameraPlaceholder.style.display="grid";
  cameraSwitchBtn.disabled=true;
- cameraStopBtn.disabled=true;
  cameraStatus.textContent="Kamera dimatikan.";
 }
 
@@ -1198,7 +1191,7 @@ function setCameraMode(enabled){
  if(!enabled){
   stopLiveCamera();
  }else{
-  cameraStatus.textContent="Kamera ON. Tekan Mulai Kamera jika ingin menyalakan kamera.";
+  startLiveCamera();
  }
 }
 
@@ -1208,8 +1201,6 @@ cameraModeToggle.addEventListener("click",()=>{
  setCameraMode(!document.querySelector(".app").classList.contains("camera-enabled"));
 });
 
-cameraStartBtn.addEventListener("click",startLiveCamera);
-cameraStopBtn.addEventListener("click",stopLiveCamera);
 cameraSwitchBtn.addEventListener("click",async()=>{
  cameraFacing=cameraFacing==="environment"?"user":"environment";
  await startLiveCamera();
