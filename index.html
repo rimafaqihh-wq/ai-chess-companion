@@ -782,7 +782,7 @@ function handleSquareClick(square){
     selectedSquare=null;
     legalMoves=[];
     renderBoard();
-    animatePieceToSquare(selectedSquare,square,result);
+    animatePieceToSquare(result.from,result.to,result);
     updateGameStatus();
     scheduleComputerTurn();
     return;
